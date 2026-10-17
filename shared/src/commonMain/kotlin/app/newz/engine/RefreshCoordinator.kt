@@ -56,11 +56,19 @@ class RefreshCoordinator(
     val isRunning: StateFlow<Boolean> = running.asStateFlow()
 
     /** Starts a load, or returns the one already running. */
-    fun refresh(): Deferred<LoadResult> {
+    fun refresh(): Deferred<LoadResult> = startOrJoin(only = null)
+
+    /**
+     * Re-fetches the followed feed [feedId] alone (a failing feed's Retry in Settings › Sources).
+     * A load already running is joined instead: no second load starts.
+     */
+    fun retry(feedId: String): Deferred<LoadResult> = startOrJoin(only = feedId)
+
+    private fun startOrJoin(only: String?): Deferred<LoadResult> {
         while (true) {
             val active = current.load()
             if (active != null && active.isActive) return active
-            val next = scope.async(start = CoroutineStart.LAZY) { load() }
+            val next = scope.async(start = CoroutineStart.LAZY) { load(only) }
             if (current.compareAndSet(active, next)) {
                 next.start()
                 return next
@@ -69,14 +77,15 @@ class RefreshCoordinator(
         }
     }
 
-    private suspend fun load(): LoadResult {
+    private suspend fun load(only: String?): LoadResult {
         running.value = true
         try {
             val startPrefs = prefs.first()
-            val sources =
+            val followed =
                 withContext(storeDispatcher) {
                     FeedFetcher.followedSources(startPrefs, catalog, store.listCustomFeeds())
                 }
+            val sources = if (only == null) followed else followed.filter { it.feedId == only }
             var offline = false
             var anyOk = false
             fetcher.fetch(sources).collect { progress ->
@@ -85,7 +94,7 @@ class RefreshCoordinator(
                 onProgress(progress)
             }
             // Every source failing reads as offline (SPEC S25), so the cache shows with the banner.
-            if (sources.isNotEmpty() && !anyOk) offline = true
+            if (only == null && sources.isNotEmpty() && !anyOk) offline = true
             val latest = prefs.first()
             val result =
                 withContext(storeDispatcher) {
@@ -97,7 +106,7 @@ class RefreshCoordinator(
                             .feedStatuses()
                             .filter { it.failingSince != null }
                             .mapTo(HashSet()) { it.feedId }
-                            .intersect(sources.mapTo(HashSet()) { it.feedId })
+                            .intersect(followed.mapTo(HashSet()) { it.feedId })
                     LoadResult(FeedSnapshot.read(store, latest), offline, failing)
                 }
             onLoaded(result)

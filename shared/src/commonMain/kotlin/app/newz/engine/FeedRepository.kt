@@ -114,6 +114,9 @@ class FeedRepository(
         return coordinator.refresh()
     }
 
+    /** Re-fetches the one followed feed [feedId] (Retry on a failing feed); joins a load already running. */
+    fun retryFeed(feedId: String): Job = coordinator.retry(feedId)
+
     /** Serves the next page of cards. */
     fun loadMore(): Job =
         scope.launch {

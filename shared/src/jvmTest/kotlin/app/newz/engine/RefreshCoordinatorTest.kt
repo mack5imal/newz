@@ -159,4 +159,43 @@ class RefreshCoordinatorTest {
             repo.refresh().join()
             assertEquals(listOf("b"), h.store.articles().map { it.outletId })
         }
+
+    @Test
+    fun retryFetchesOnlyThatFeedAndClearsItsFailure() =
+        runTest {
+            val h = EngineHarness()
+            listOf("a", "b", "c").forEachIndexed { i, f ->
+                h.items[f] = listOf(TestItem("$f-1", EngineHarness.uniqueTitle(i)))
+            }
+            h.failing += "b"
+            val repo = h.repository(backgroundScope)
+            repo.feed.first()
+            repo.refresh().join()
+            assertEquals(setOf("b-world"), assertIs<FeedState.Content>(repo.feed.first()).failingFeeds)
+            assertEquals(listOf(1, 1, 1), listOf("a", "b", "c").map(h::requestsTo))
+
+            h.failing.clear()
+            repo.retryFeed("b-world").join()
+            assertEquals(listOf(1, 2, 1), listOf("a", "b", "c").map(h::requestsTo), "only the retried feed is fetched")
+            val content = assertIs<FeedState.Content>(repo.feed.first())
+            assertTrue(content.failingFeeds.isEmpty())
+            assertFalse(content.offline)
+            assertEquals(3, content.cards.size)
+        }
+
+    @Test
+    fun retryDuringALoadJoinsIt() =
+        runTest {
+            val h = EngineHarness()
+            listOf("a", "b", "c").forEachIndexed { i, f ->
+                h.items[f] = listOf(TestItem("$f-1", EngineHarness.uniqueTitle(i)))
+            }
+            val repo = h.repository(backgroundScope)
+            val gate = h.startHeldLoad(repo)
+            val running = repo.refresh()
+            assertTrue(repo.retryFeed("b-world") === running, "Retry joins the running load")
+            gate.complete(Unit)
+            running.join()
+            assertEquals(listOf(1, 1, 1), listOf("a", "b", "c").map(h::requestsTo))
+        }
 }
