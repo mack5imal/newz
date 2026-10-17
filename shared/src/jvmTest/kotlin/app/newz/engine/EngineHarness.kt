@@ -36,7 +36,8 @@ data class TestItem(
 /**
  * A FeedRepository wired to an in-memory store and a counting MockEngine. Feeds `a`, `b`, `c`
  * (outlets of the same name, topic `world`) are served from [items]; a feed listed in
- * [failing] answers HTTP 500. While [gate] is set every request waits on it.
+ * [failing] answers HTTP 500. While [gate] is set every request waits on it; a request to a feed
+ * with an entry in [feedGates] also waits on that entry.
  */
 class EngineHarness(
     feedIds: List<String> = listOf("a", "b", "c"),
@@ -67,6 +68,8 @@ class EngineHarness(
 
     @Volatile var gate: CompletableDeferred<Unit>? = null
 
+    val feedGates = ConcurrentHashMap<String, CompletableDeferred<Unit>>()
+
     @Volatile var online = true
 
     /** Completed once [expected] requests have arrived. */
@@ -83,6 +86,7 @@ class EngineHarness(
             try {
                 gate?.await()
                 val feedId = feedIds.first { urlOf(it) == url }
+                feedGates[feedId]?.await()
                 if (feedId in failing) {
                     respond("", HttpStatusCode.InternalServerError)
                 } else {

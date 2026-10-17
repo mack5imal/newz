@@ -18,6 +18,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 class FeedRepositoryTest {
     private fun EngineHarness.cache(
@@ -119,6 +120,28 @@ class FeedRepositoryTest {
                     .toSet()
                     .size,
             )
+        }
+
+    @Test
+    fun aFeedLandingAfterLoadMoreKeepsTheServedCards() =
+        runTest {
+            val h = EngineHarness(listOf("a", "b"))
+            h.items["a"] = (0 until 12).map { TestItem("a$it", EngineHarness.uniqueTitle(it), age = (it + 1).hours) }
+            h.items["b"] = (0 until 6).map { TestItem("b$it", EngineHarness.uniqueTitle(100 + it), age = 30.minutes) }
+            val slowB = CompletableDeferred<Unit>()
+            h.feedGates["b"] = slowB
+            val repo = h.repository(backgroundScope, pageSize = 5)
+            val firstPage = assertIs<FeedState.Content>(repo.feed.first { it is FeedState.Content })
+            assertEquals(5, firstPage.cards.size)
+            repo.loadMore().join()
+            val paged = assertIs<FeedState.Content>(repo.feed.first()).cards.map { it.group.lead.id }
+            assertEquals(10, paged.size)
+            slowB.complete(Unit)
+            repo.refresh().join()
+            val after = assertIs<FeedState.Content>(repo.feed.first()).cards.map { it.group.lead.id }
+            assertTrue(after.size >= paged.size, "served cards shrank from ${paged.size} to ${after.size}")
+            assertEquals(paged, after.take(paged.size))
+            assertEquals(1, h.requestsTo("b"))
         }
 
     @Test

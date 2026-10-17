@@ -77,8 +77,14 @@ class FeedRepository(
 ) {
     private val state = MutableStateFlow<FeedState>(FeedState.Loading(firstLoad = true))
 
-    /** True while a load that began with no cards shown is still landing feeds. */
+    /** True while a load that began with no cards shown is still landing feeds. Guarded by [lock]. */
     private var growing = false
+
+    /**
+     * True once the user paged ([loadMore]) or changed the store ([invalidate]) during a growing
+     * load: landed feeds then merge into the served cards instead of re-ranking them. Guarded by [lock].
+     */
+    private var userMoved = false
     private val lock = Mutex()
     private val pager = FeedPager(pageSize)
     private var selectedTopics: Set<String> = emptySet()
@@ -125,6 +131,7 @@ class FeedRepository(
         scope.launch {
             lock.withLock {
                 if (state.value !is FeedState.Content || pager.endReached) return@withLock
+                userMoved = true
                 pager.next()
                 state.value = content()
             }
@@ -148,7 +155,11 @@ class FeedRepository(
      * Recomposes the feed from the cache without fetching, for store-side changes (hide, unhide,
      * save, unsave) made by phases 12-17: served cards keep their places and excluded ones drop out.
      */
-    fun invalidate(): Job = scope.launch { recompose() }
+    fun invalidate(): Job =
+        scope.launch {
+            lock.withLock { userMoved = true }
+            recompose()
+        }
 
     private suspend fun recompose() {
         publish(readSnapshot(), reset = false, loading = coordinator.isRunning.value)
@@ -178,18 +189,22 @@ class FeedRepository(
         if (!landed) return
         if (state.value !is FeedState.Content) {
             offline = false
-            growing = true
+            lock.withLock {
+                growing = true
+                userMoved = false
+            }
             publish(readSnapshot(), reset = true, loading = true)
-        } else if (growing) {
-            // A load that started with nothing on screen re-ranks as each feed lands, so one
-            // slow feed never holds back the others. Loads over shown cards merge once, at the end.
-            publish(readSnapshot(), reset = true, loading = true)
+        } else if (lock.withLock { growing }) {
+            // A load that started with nothing on screen publishes as each feed lands, so one slow
+            // feed never holds back the others: it re-ranks until the user pages or acts on the
+            // feed, then merges. Loads over shown cards merge once, at the end.
+            publish(readSnapshot(), reset = true, loading = true, whileGrowing = true)
         }
     }
 
     private suspend fun onLoaded(result: LoadResult) {
         loadedOnce = true
-        growing = false
+        lock.withLock { growing = false }
         offline = result.offline
         failing = result.failingFeeds
         publish(result.snapshot, reset = state.value !is FeedState.Content, loading = false)
@@ -199,10 +214,13 @@ class FeedRepository(
         snapshot: FeedSnapshot,
         reset: Boolean,
         loading: Boolean,
+        whileGrowing: Boolean = false,
     ) {
         val groups = FeedComposer.compose(snapshot, catalog, selectedTopics, clock())
         lock.withLock {
-            if (reset) pager.reset(groups) else pager.submit(groups)
+            if (whileGrowing && !growing) return
+            val rerank = if (whileGrowing) reset && !userMoved else reset
+            if (rerank) pager.reset(groups) else pager.submit(groups)
             if (pager.servedGroups.size < pager.pageSize) pager.page(0)
             savedIds = snapshot.savedIds
             composedPrefs = snapshot.prefs
