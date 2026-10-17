@@ -91,6 +91,14 @@ fun BackupScreen(
                     subtitle = "$name is in $folder. Copy it to your new phone and import it there.",
                 )
             }
+            if (note == BackupNote.ExportFailed) {
+                NoteRow(
+                    icon = NewzIcons.iconWarning,
+                    text = "Backup not saved",
+                    subtitle = "Nothing was written. Try again or choose another folder.",
+                    color = c.alert,
+                )
+            }
         }
         Panel(title = "Import") {
             PlainText(

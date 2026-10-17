@@ -256,4 +256,20 @@ class BackupScreenTest {
         assertEquals(before, currentPrefs())
         assertTrue(compose.onAllNodes(hasText("Backup imported")).fetchSemanticsNodes().isEmpty())
     }
+
+    @Test
+    fun failedExportSaysNothingWasSaved() {
+        server.fill(itemsPerFeed = 3)
+        start()
+        openBackup()
+        val unwritable = File(File(cacheDir, "backup-test-missing-dir"), "backup.json")
+        unwritable.parentFile?.deleteRecursively()
+
+        stubPickers(unwritable)
+        tap("Export to a file")
+        compose.waitForText("Backup not saved", TIMEOUT)
+        compose.onNodeWithText("Nothing was written.", substring = true).assertExists()
+        assertTrue(compose.onAllNodes(hasText("Backup saved")).fetchSemanticsNodes().isEmpty())
+        assertTrue(!unwritable.exists())
+    }
 }

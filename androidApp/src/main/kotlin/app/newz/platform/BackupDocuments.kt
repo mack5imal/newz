@@ -24,6 +24,23 @@ object BackupDocuments {
         out.use { it.write(text.toByteArray(Charsets.UTF_8)) }
     }
 
+    /**
+     * Best-effort removal of the document at [uri], e.g. the empty file the picker created before a
+     * failed write. Never throws.
+     */
+    fun delete(
+        resolver: ContentResolver,
+        uri: Uri,
+    ) {
+        runCatching {
+            when (uri.scheme) {
+                ContentResolver.SCHEME_FILE -> uri.path?.let { File(it).delete() }
+                ContentResolver.SCHEME_CONTENT -> DocumentsContract.deleteDocument(resolver, uri)
+                else -> Unit
+            }
+        }
+    }
+
     /** The file's text, or null when it cannot be read or is over [MAX_BYTES]. */
     fun read(
         resolver: ContentResolver,

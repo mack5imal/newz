@@ -33,6 +33,9 @@ sealed interface BackupNote {
     ) : BackupNote
 
     data object ImportFailed : BackupNote
+
+    /** The backup could not be written; the empty file the picker created was removed. */
+    data object ExportFailed : BackupNote
 }
 
 /**
@@ -80,7 +83,9 @@ class BackupViewModel(
                             history = if (withHistory) store.listHistory() else null,
                             includeHistory = withHistory,
                         )
-                    runCatching { BackupDocuments.write(resolver, uri, text) }.isSuccess
+                    runCatching { BackupDocuments.write(resolver, uri, text) }
+                        .onFailure { BackupDocuments.delete(resolver, uri) }
+                        .isSuccess
                 }
             noteState.value =
                 if (written) {
@@ -89,7 +94,7 @@ class BackupViewModel(
                         folder = BackupDocuments.folderName(uri),
                     )
                 } else {
-                    null
+                    BackupNote.ExportFailed
                 }
         }
     }
