@@ -104,7 +104,8 @@ if [ "$deps_status" -ne 0 ] || ! grep -q -- '--- ' <<< "$deps"; then
   printf '%s\n' "$deps" | tail -n 20
   fail "could not produce the releaseRuntimeClasspath dependency report"
 else
-  pattern="$(printf '%s:|' "${FORBIDDEN_GROUPS[@]}" | sed 's/\./\\./g; s/|$//')"
+  # Each group matches as itself or as a prefix of a sub-group (group: or group.).
+  pattern="$(printf '%s\n' "${FORBIDDEN_GROUPS[@]}" | sed 's/\./\\./g; s/$/[.:]/' | paste -sd '|' -)"
   hits="$(grep -E -- "($pattern)" <<< "$deps" || true)"
   if [ -n "$hits" ]; then
     printf '%s\n' "$hits" | sed 's/^/  /'
