@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
@@ -38,6 +40,7 @@ import app.newz.testing.TestPrefs
 import app.newz.testing.currentPrefs
 import app.newz.testing.feedOf
 import app.newz.testing.servedCards
+import app.newz.testing.tapText
 import app.newz.testing.visibleCards
 import app.newz.testing.waitForStableFeed
 import app.newz.testing.waitForText
@@ -219,7 +222,20 @@ class SettingsControlsTest {
         compose.waitUntil(TIMEOUT) { store.listHistory().size == 1 }
 
         openSettings()
-        compose.onNode(hasText("Clear reading history") and hasClickAction()).performScrollTo().performClick()
+        // Clearing asks first: Cancel keeps the history, Clear history clears it.
+        val clear = hasText("Clear reading history") and hasClickAction()
+        compose.onNode(clear).performScrollTo().performClick()
+        compose.waitForText("Clear reading history?")
+        compose
+            .onNodeWithText(
+                "This removes what you’ve opened from this phone. It can’t be undone.",
+            ).assertIsDisplayed()
+        compose.onNode(hasText("Cancel") and hasClickAction()).performClick()
+        compose.waitUntil(TIMEOUT) { !exists(hasText("Clear reading history?")) }
+        assertEquals("cancel keeps history", 1, store.listHistory().size)
+
+        compose.onNode(clear).performScrollTo().performClick()
+        compose.tapText("Clear history")
         compose.waitForText("Reading history cleared")
         compose.waitUntil(TIMEOUT) { store.listHistory().isEmpty() }
         assertTrue("no Undo", !exists(hasText("Undo")))

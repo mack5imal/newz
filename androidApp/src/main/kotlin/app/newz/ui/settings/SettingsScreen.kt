@@ -19,6 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -26,6 +29,7 @@ import app.newz.store.TextSize
 import app.newz.ui.components.AppBarSub
 import app.newz.ui.components.Button
 import app.newz.ui.components.ButtonVariant
+import app.newz.ui.components.ConfirmSheet
 import app.newz.ui.components.ListRow
 import app.newz.ui.components.Panel
 import app.newz.ui.components.PlainText
@@ -61,8 +65,9 @@ private val ROW_TEXT_INSET = NewzTokens.spaceL + NewzTokens.iconSize + NewzToken
 
 /**
  * Settings home (design `settings`): Your feed, Reading and Your data panels. The Your feed rows
- * carry live counts; the paywall filter and reading history switches, Clear reading history and
- * the text size control (applied at once through the theme's text scale) act immediately.
+ * carry live counts; the paywall filter and reading history switches and the text size control
+ * (applied at once through the theme's text scale) act immediately. Clear reading history asks
+ * first in a [ConfirmSheet], since it can't be undone.
  */
 @Composable
 fun SettingsScreen(
@@ -71,6 +76,7 @@ fun SettingsScreen(
 ) {
     val prefs by viewModel.prefs.collectAsState()
     val counts by viewModel.counts.collectAsState()
+    var confirmClear by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.reload() }
     SettingsFrame(Screen.Settings, "Settings", viewModel, destinations.onBack) {
         val p = prefs ?: return@SettingsFrame
@@ -152,7 +158,7 @@ fun SettingsScreen(
             Divider()
             Button(
                 text = "Clear reading history",
-                onClick = viewModel::clearHistory,
+                onClick = { confirmClear = true },
                 variant = ButtonVariant.Outline,
                 modifier =
                     Modifier.padding(
@@ -189,6 +195,18 @@ fun SettingsScreen(
                 onClick = { destinations.open(Screen.About) },
             )
         }
+    }
+    if (confirmClear) {
+        ConfirmSheet(
+            title = "Clear reading history?",
+            message = "This removes what you’ve opened from this phone. It can’t be undone.",
+            confirmLabel = "Clear history",
+            onConfirm = {
+                confirmClear = false
+                viewModel.clearHistory()
+            },
+            onDismiss = { confirmClear = false },
+        )
     }
 }
 

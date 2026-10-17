@@ -49,6 +49,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import app.newz.ui.theme.NewzTokens
+import app.newz.ui.theme.SignageText
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -232,6 +233,50 @@ fun BottomActionBar(
                 enabled = buttonEnabled,
                 trailingIcon = buttonTrailingIcon,
             )
+        }
+    }
+}
+
+/**
+ * `ConfirmSheet` — asks before an action that can't be undone: a [BottomSheet] spoken [title],
+ * the [title] in `type-sheet-title`, the [message] in `type-intro` `ink-muted`, then Cancel (Text)
+ * and the Primary [confirmLabel] at the right, as on the zip code sheet. [onConfirm] runs the
+ * action (the caller closes the sheet); Cancel, a swipe down, a tap outside and Back call [onDismiss].
+ */
+@Composable
+fun ConfirmSheet(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    cancelLabel: String = "Cancel",
+) {
+    val c = palette()
+    BottomSheet(onDismiss = onDismiss, label = title) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = NewzTokens.spaceXl,
+                    end = NewzTokens.spaceXl,
+                    bottom = NewzTokens.spaceXl + NewzTokens.spaceXs,
+                ),
+        ) {
+            SignageText(text = title, style = NewzTokens.typeSheetTitle, color = c.ink)
+            PlainText(
+                text = message,
+                style = NewzTokens.typeIntro,
+                color = c.inkMuted,
+                modifier = Modifier.padding(top = NewzTokens.spaceXs),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = NewzTokens.spaceL),
+                horizontalArrangement = Arrangement.spacedBy(NewzTokens.spaceS, Alignment.End),
+            ) {
+                Button(text = cancelLabel, onClick = onDismiss, variant = ButtonVariant.Text)
+                Button(text = confirmLabel, onClick = onConfirm, variant = ButtonVariant.Primary)
+            }
         }
     }
 }

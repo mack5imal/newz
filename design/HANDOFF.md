@@ -439,7 +439,7 @@ Each opens its screen: `settings-sources`, `settings-topics`, `settings-hidden`,
 Reading:
 - Paywall filter — `Switch`. When on, hides outlets that are paywalled in the catalog or marked by the user.
 - Reading history — `Switch`. Turning it off stops recording but doesn't clear what's stored.
-- "Clear reading history" — Outline `Button`, indented to line up with the text (52 dp). Clears at once and shows a `Snackbar` "Reading history cleared" with no Undo.
+- "Clear reading history" — Outline `Button`, indented to line up with the text (52 dp). Opens a `ConfirmSheet` (a `BottomSheet` with the title, the message in `type-intro` `ink-muted`, and Cancel (Text) / "Clear history" (Primary) at the right, as on the zip code sheet); "Clear history" clears and shows a `Snackbar` "Reading history cleared" with no Undo.
 - Text size — row title with an icon, then a full-width `SegmentedControl` (Small / Default / Large / Extra large). Applies immediately; see Text size.
 
 Your data:
@@ -777,6 +777,10 @@ Strings are exact. Signage-styled text (see `font-signage`) displays in capitals
 - `Reading history`
 - `Kept only on this phone, to tune your feed and suggestions`
 - `Clear reading history`
+- `Clear reading history?` (confirm sheet; not drawn)
+- `This removes what you’ve opened from this phone. It can’t be undone.`
+- `Clear history`
+- `Cancel`
 - `Reading history cleared` (snackbar, no Undo; not drawn)
 - `Text size`
 - `Small`
