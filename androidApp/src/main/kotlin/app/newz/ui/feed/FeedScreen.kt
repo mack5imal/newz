@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -29,12 +31,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import app.newz.dedup.StoryGroup
 import app.newz.engine.EmptyReason
 import app.newz.engine.FeedCard
@@ -58,6 +62,7 @@ import app.newz.ui.theme.NewzIcons
 import app.newz.ui.theme.NewzTokens
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlin.math.roundToInt
 import kotlin.time.Instant
 
 /** The all-filtered body and the offline-empty body (SPEC S25 wording), verbatim from the Copy. */
@@ -68,6 +73,10 @@ private const val ALL_FILTERED_BODY =
 @Suppress("ktlint:standard:max-line-length")
 private const val OFFLINE_EMPTY_BODY =
     "New articles load as soon as you’re connected again. Articles you saved for later are still in Saved."
+
+/** The pull-to-refresh panel: the `LoadingBoard` tiles with 12 above and below. */
+private val REFRESH_PANEL_HEIGHT =
+    NewzTokens.tileSize.height + NewzTokens.spaceXs + NewzTokens.space2xs + NewzTokens.spaceM * 2
 
 /** `loadMore()` fires when the last visible card is within this many items of the end. */
 private const val LOAD_MORE_THRESHOLD = 5
@@ -86,6 +95,7 @@ object FeedSemantics {
     const val LIST_TAG = "feedList"
     const val CARD_TAG = "articleCard"
     const val STORY_ROW_TAG = "storyRow"
+    const val REFRESH_PANEL_TAG = "refreshPanel"
 
     val Card = SemanticsPropertyKey<FeedCardInfo>("FeedCard")
     val Cards = SemanticsPropertyKey<List<FeedCardInfo>>("FeedCards")
@@ -106,7 +116,8 @@ private fun FeedCard.info(): FeedCardInfo {
  * The feed (design `feed`): `AppBarMain` with Saved and Settings, then a list whose first item
  * is the `TopicChipRow` (it scrolls away), then `ArticleCard`s, with every drawn state: first
  * load, filter active / empty, end of feed, all filtered, offline with cache and offline empty.
- * Pull to refresh shows the `LoadingBoard` tiles. ⋮ and a long-press open [CardMenuSheet],
+ * Pull to refresh slides the `LoadingBoard` tiles down on a `paper` panel and moves the list down
+ * below it. ⋮ and a long-press open [CardMenuSheet],
  * whose Mute a keyword… opens [KeywordMuteSheet]. A card removed by an action collapses out
  * (`card-collapse`). The Undo `Snackbar` host lives here.
  */
@@ -137,17 +148,29 @@ fun FeedScreen(
         Column(Modifier.fillMaxSize()) {
             AppBarMain(onSaved = onOpenSaved, onSettings = onOpenSettings)
             val pullState = rememberPullToRefreshState()
+            // The pull reveals a `paper` panel holding the tiles from under the app bar and pushes
+            // the list (chips first) down by as much, so the tiles never sit on the chips.
+            val pulled = { pullState.distanceFraction.coerceIn(0f, 1f) }
             PullToRefreshBox(
                 isRefreshing = refreshing,
                 onRefresh = viewModel::refresh,
                 state = pullState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().clipToBounds(),
                 indicator = {
-                    if (refreshing || pullState.distanceFraction > 0f) {
-                        LoadingBoard(
-                            label = null,
-                            modifier = Modifier.align(Alignment.TopCenter).padding(top = NewzTokens.spaceM),
-                        )
+                    if (pullState.distanceFraction > 0f) {
+                        Box(
+                            Modifier
+                                .align(Alignment.TopCenter)
+                                .fillMaxWidth()
+                                .height(REFRESH_PANEL_HEIGHT)
+                                .offset {
+                                    IntOffset(0, -((1f - pulled()) * REFRESH_PANEL_HEIGHT.toPx()).roundToInt())
+                                }.background(c.paper)
+                                .testTag(FeedSemantics.REFRESH_PANEL_TAG),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            LoadingBoard(label = null)
+                        }
                     }
                 },
             ) {
@@ -158,6 +181,7 @@ fun FeedScreen(
                     modifier =
                         Modifier
                             .fillMaxSize()
+                            .offset { IntOffset(0, (pulled() * REFRESH_PANEL_HEIGHT.toPx()).roundToInt()) }
                             .testTag(FeedSemantics.LIST_TAG)
                             .semantics { feedCards = cards.map { it.info() } },
                 ) {

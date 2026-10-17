@@ -4,6 +4,7 @@ import android.app.UiModeManager
 import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -22,6 +23,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -108,6 +110,42 @@ class FeedScreenTest {
         compose.onNode(unmerged and hasAnyDescendant(visual), useUnmergedTree = true).assertExists()
         val expectedTag = if (item.imageUrl != null) ARTICLE_IMAGE_TAG else NO_IMAGE_TAG
         compose.onNode(unmerged and hasAnyDescendant(hasTestTag(expectedTag)), useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun pullToRefreshTilesSlideInAboveTheChips() {
+        server.fill(itemsPerFeed = 2)
+        TestApp.install(TestCatalog.build(server))
+        TestPrefs.onboarded()
+        launch()
+        compose.waitForStableFeed(minCards = 16)
+        val chip = hasText("World") and hasClickAction()
+        val chipTop =
+            compose
+                .onNode(chip)
+                .fetchSemanticsNode()
+                .positionInRoot.y
+
+        // Hold a pull past the refresh threshold: the tiles' panel slides in and pushes the chips down.
+        val list = compose.onNodeWithTag(FeedSemantics.LIST_TAG)
+        list.performTouchInput {
+            down(Offset(centerX, top + 10f))
+            repeat(PULL_STEPS) { moveBy(Offset(0f, PULL_STEP_PX)) }
+        }
+        compose.waitForIdle()
+        val panel = compose.onNodeWithTag(FeedSemantics.REFRESH_PANEL_TAG).fetchSemanticsNode().boundsInRoot
+        val pulledChipTop =
+            compose
+                .onNode(chip)
+                .fetchSemanticsNode()
+                .positionInRoot.y
+        assertTrue("panel shows ($panel)", panel.height > 0f)
+        assertTrue("chips moved down: $chipTop -> $pulledChipTop", pulledChipTop > chipTop)
+        assertTrue("panel ends above the chips: ${panel.bottom} <= $pulledChipTop", panel.bottom <= pulledChipTop + 1f)
+        list.performTouchInput { up() }
+        compose.waitUntil(TIMEOUT_MS) {
+            compose.onAllNodesWithTag(FeedSemantics.REFRESH_PANEL_TAG).fetchSemanticsNodes().isEmpty()
+        }
     }
 
     @Test
@@ -411,6 +449,9 @@ class FeedScreenTest {
         const val ALL_FILTERED = "Nothing to show — your filters hide everything"
         const val OFFLINE_BANNER = "Offline — showing articles loaded earlier"
         const val MAX_STEPS = 120
+        const val PULL_STEPS = 20
+        const val PULL_STEP_PX = 40f
+        const val TIMEOUT_MS = 10_000L
         const val CUSTOM_WORD = "zeppelin"
         val GAP_PROBE = 7.dp
         val AGE = Regex("just now|\\d+ (minute|hour|day)s? ago")

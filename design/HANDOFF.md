@@ -306,7 +306,7 @@ Interactions:
 - "+n sources" opens `story-group`.
 - Saved opens `saved`; Settings opens `settings`.
 - Tapping a chip toggles it, and several can be selected. With any chip selected, the feed shows only articles in those topics.
-- Pull to refresh drops a `LoadingBoard` (4 tiles, no text) in under the chip row until new articles are merged in. Age tiles that change flip.
+- Pull to refresh slides a `paper` panel holding a `LoadingBoard` (4 tiles, no text, 12 above and below) down from under the app bar with the pull, and moves the list (chip row first) down by as much, so the tiles never cover the chips; it stays until new articles are merged in. Age tiles that change flip.
 
 States:
 - `feed.png` (populated) — a grouped card ("+3 sources") and a card with no image (`NoImagePanel` showing the topic); a third card starts below the bottom edge.
