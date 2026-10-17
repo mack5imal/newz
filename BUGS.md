@@ -9,6 +9,29 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 
 ## Open
 
+
+### B17 — Wordmark flips forever and "Refreshing your feed…" never goes away
+- **Severity:** High (feed never finishes loading; phone CPU at 100%, battery drain)
+- **Where:** `shared/src/commonMain/kotlin/app/newz/dedup/StoryGrouper.kt` (`group`, `Building.similarity`),
+  called from `FeedRepository.onProgress` → `publish` → `FeedComposer.compose`
+- **Seen:** on the phone (Galaxy A71, release build, fresh install): the NEWZ tiles never stop
+  flipping, and after pull to refresh "Refreshing your feed…" stays. Same with Better pictures
+  on or off. Reproduced on the emulator with the release build after a fresh onboarding.
+- **Cause (confirmed by thread dump):** the first load is still running. While a first load runs,
+  the feed is recomposed every time a single feed lands, and each recompose re-groups *every*
+  cached article for duplicates by comparing each article with every story group, recomputing
+  each group's vector length on every comparison (roughly N² work for N articles). With a few
+  thousand articles and ~100 feeds that is minutes of CPU per feed, so the load effectively never
+  ends. The wordmark animates and the refresh band shows for as long as a load runs. Pull to
+  refresh joins the load that is already running, so it never ends either. Tests use small feeds,
+  so they never hit it.
+- **Fix idea:** make grouping near-linear (keep each group's vector length up to date, only compare
+  groups inside the 48-hour window, and only groups sharing a word with the article), and while a
+  first load runs recompose at most every ~1 s instead of once per feed; add a performance test
+  with thousands of articles.
+
+## Fixed
+
 ### B9 — Opened article has no easy way back to Newz
 - **Severity:** Medium (feature request)
 - **Where:** `androidApp/src/main/kotlin/app/newz/platform/ArticleOpener.kt`
@@ -23,9 +46,7 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 - **Fix idea:** an in-app reader screen (Android WebView) with a Newz top bar (back, title,
   share, open in browser). Privacy check needed: switch off WebView's Safe Browsing, which
   contacts Google; no third-party cookies; same blocked-host rules as the feed.
-- **Status:** deferred (2026-10-17). Kept Custom Tabs; to be tried on a real phone and then decide on an in-app reader.
-
-## Fixed
+- **Resolved (2026-10-17):** on the phone, articles open in Brave's in-app tab, which works well. No in-app reader needed; no code change.
 
 ### B12 — "Change it in Settings" doesn't say where
 - **Severity:** Medium
