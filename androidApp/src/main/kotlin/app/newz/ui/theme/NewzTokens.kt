@@ -268,7 +268,7 @@ object NewzTokens {
     val typeSegment = signage(FontWeight.Bold, 16.sp, 16.sp, 0.05.em)
     val typeTag = signage(FontWeight.Bold, 14.sp, tracking = 0.08.em)
     val typeTile = signage(FontWeight.ExtraBold, 24.sp)
-    val typeHeadline = text(FontWeight.Bold, 21.sp, 27.sp, (-0.01).em)
+    val typeHeadline = text(FontWeight.Bold, 18.sp, 24.sp, (-0.01).em)
     val typeHeading = text(FontWeight.Bold, 24.sp, 30.sp)
     val typeBody = text(FontWeight.Normal, 16.sp, 24.sp)
     val typeRowTitle = text(FontWeight.SemiBold, 16.sp, 22.sp)

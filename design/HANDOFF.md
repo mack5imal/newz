@@ -112,7 +112,7 @@ Sizes and line heights are in sp, tracking is in em, and "caps" means uppercase 
 | `type-segment` | signage 700 · 16/16 · +0.05 · caps | segmented controls (a segment may wrap to 2 lines) |
 | `type-tag` | signage 700 · 14 · +0.08 · caps | tags ("Paywall", "Following") |
 | `type-tile` | signage 800 · 24 (18 on small tiles) · caps | flap-tile characters |
-| `type-headline` | text 700 · 21/27 · −0.01 | card headlines; 18/24 in the Saved list; 20/26 as the story-sheet title |
+| `type-headline` | text 700 · 18/24 · −0.01 | card headlines and the story-sheet title (21/27 until B20); the Saved list uses the same 18/24 |
 | `type-heading` | text 700 · 24/30 | onboarding heading |
 | `type-body` | text 400 · 16/24 | empty-state body, onboarding promise |
 | `type-row-title` | text 600 · 16/22 | list-row titles and the sheet header headline; 500 weight for sheet action rows and story-row headlines |
@@ -401,7 +401,7 @@ States:
 ### story-group — Same story, other outlets
 
 A `BottomSheet` opened by "+n sources", containing:
-- Header (padding 8 20 16): meta line "Same story · {n} outlets", then the story headline (`type-headline` at 20/26).
+- Header (padding 8 20 16): meta line "Same story · {n} outlets", then the story headline in `type-headline` (18/24 since B20).
 - One `StoryRow` per outlet, including the one shown in the feed, sorted newest first.
 - Catalog-paywalled outlets show a "Paywall" `Tag`.
 

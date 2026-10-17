@@ -125,7 +125,7 @@ class ThemeTest {
 
         val xl = NewzTextScale.of(TextSize.EXTRA_LARGE)
         // Content styles scale; the wordmark and app-bar nav do not.
-        assertEquals(21f * 1.33f, sizeAt(NewzTokens.typeHeadline, xl), 0.001f)
+        assertEquals(18f * 1.33f, sizeAt(NewzTokens.typeHeadline, xl), 0.001f)
         assertEquals(18f * 1.25f, sizeAt(NewzTokens.typeOutlet, xl), 0.001f)
         assertEquals(40f, sizeAt(NewzTokens.typeWordmark, xl), 0.001f)
         assertEquals(18f, sizeAt(NewzTokens.typeNav, xl), 0.001f)
