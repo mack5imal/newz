@@ -39,6 +39,14 @@ internal val NEWEST_FIRST: Comparator<Article> =
  * least [threshold], else it starts a group. A group only takes an article within [WINDOW] of all
  * its members and never two articles from one outlet. Comparing against the centroid rather than
  * any single member keeps A~B, B~C from chaining A and C together when they are unrelated.
+ *
+ * Near-linear (B17): each group keeps its centroid's length up to date instead of recomputing it
+ * per comparison; groups whose newest member is more than [WINDOW] newer than the current article
+ * are retired (later articles are older still, so they never join them); and an index from term
+ * to groups scores only groups sharing at least one term with the article, summing just the shared
+ * terms. A group sharing none has cosine 0, below any positive [threshold], so skipping it changes
+ * nothing; the skipped terms add exactly 0.0, so the cosines are bit for bit the same. Ties still
+ * go to the oldest group, as when every group was scanned in creation order.
  */
 class StoryGrouper(
     private val threshold: Double = SAME_STORY_THRESHOLD,
@@ -50,48 +58,119 @@ class StoryGrouper(
         val ordered = articles.sortedWith(NEWEST_FIRST)
         val vectors = vectors(ordered)
         val groups = mutableListOf<Building>()
+        val byTerm = HashMap<String, MutableList<Building>>()
+        // Groups are created newest first, so the retired ones are always a prefix of [groups].
+        var live = 0
         ordered.forEachIndexed { i, article ->
             val v = vectors[i]
+            while (live < groups.size && groups[live].expiredFor(article)) live++
             val best =
-                if (v.isEmpty()) {
-                    null
-                } else {
-                    groups
-                        .filter { it.accepts(article) }
-                        .map { it to it.similarity(v) }
-                        .filter { it.second >= threshold }
-                        .maxByOrNull { it.second }
-                        ?.first
+                when {
+                    v.isEmpty() -> null
+
+                    threshold > 0.0 -> bestSharing(article, v, live, byTerm, stamp = i)
+
+                    // A group sharing no term (cosine 0) can still pass: score every live group.
+                    else -> bestOf(article, groups.subList(live, groups.size).map { it to it.similarity(v) })
                 }
-            if (best != null) best.add(article, v) else groups += Building(article, v)
+            val target = best ?: Building(groups.size, article).also { groups += it }
+            for (term in target.add(article, v)) byTerm.getOrPut(term) { mutableListOf() } += target
         }
         return groups.map { it.toGroup(affinity) }
     }
 
-    private class Building(
-        first: Article,
-        vector: Map<String, Double>,
-    ) {
-        val members = mutableListOf(first)
-        val outlets = mutableSetOf(first.outletId)
-        val centroid = vector.toMutableMap()
+    /**
+     * The best live group ([live] onwards) for [article] among those sharing a term with [v]. Each
+     * one's dot product sums only the shared terms, in [v]'s order, as [Building.similarity] would.
+     */
+    private fun bestSharing(
+        article: Article,
+        v: Map<String, Double>,
+        live: Int,
+        byTerm: HashMap<String, MutableList<Building>>,
+        stamp: Int,
+    ): Building? {
+        val found = mutableListOf<Building>()
+        for ((term, w) in v) {
+            val list = byTerm[term] ?: continue
+            var kept = 0
+            for (group in list) {
+                if (group.index < live) continue
+                list[kept++] = group
+                if (group.seenAt != stamp) {
+                    group.seenAt = stamp
+                    group.dot = 0.0
+                    found += group
+                }
+                group.dot += w * group.centroid.getValue(term)
+            }
+            if (kept < list.size) list.subList(kept, list.size).clear()
+        }
+        return bestOf(article, found.map { it to if (it.norm == 0.0) 0.0 else it.dot / it.norm })
+    }
 
-        fun accepts(article: Article): Boolean =
-            article.outletId !in outlets && members.all { (it.date - article.date).absoluteValue <= WINDOW }
+    /** The accepting group with the highest cosine of at least [threshold]; ties to the oldest group. */
+    private fun bestOf(
+        article: Article,
+        scored: List<Pair<Building, Double>>,
+    ): Building? {
+        var best: Building? = null
+        var bestScore = 0.0
+        for ((group, score) in scored) {
+            if (score < threshold || !group.accepts(article)) continue
+            if (best == null || score > bestScore || (score == bestScore && group.index < best.index)) {
+                best = group
+                bestScore = score
+            }
+        }
+        return best
+    }
+
+    private class Building(
+        val index: Int,
+        first: Article,
+    ) {
+        val newest = first
+        val members = mutableListOf<Article>()
+        val outlets = mutableSetOf<String>()
+        val centroid = mutableMapOf<String, Double>()
+
+        /** The centroid's length, recomputed by [add] (once per member, not once per comparison). */
+        var norm = 0.0
+
+        /** The article index that last listed this group as a candidate, and its dot product then. */
+        var seenAt = -1
+        var dot = 0.0
+
+        /**
+         * Articles arrive newest first, so [newest] is the newest member and every member lies
+         * between [article] and it: "within [WINDOW] of all members" is "within [WINDOW] of [newest]".
+         */
+        fun accepts(article: Article): Boolean = article.outletId !in outlets && !expiredFor(article)
+
+        /** True once [article] (and so every later, older one) is beyond [WINDOW] of [newest]. */
+        fun expiredFor(article: Article): Boolean = (newest.date - article.date).absoluteValue > WINDOW
 
         fun similarity(v: Map<String, Double>): Double {
-            val norm = sqrt(centroid.values.sumOf { it * it })
             if (norm == 0.0) return 0.0
             return v.entries.sumOf { (term, w) -> w * (centroid[term] ?: 0.0) } / norm
         }
 
+        /** Adds [article] with vector [v]; returns the terms new to the centroid. */
         fun add(
             article: Article,
             v: Map<String, Double>,
-        ) {
+        ): List<String> {
             members += article
             outlets += article.outletId
-            for ((term, w) in v) centroid[term] = (centroid[term] ?: 0.0) + w
+            val added = mutableListOf<String>()
+            for ((term, w) in v) {
+                val old = centroid[term]
+                if (old == null) added += term
+                centroid[term] = (old ?: 0.0) + w
+            }
+            norm = sqrt(centroid.values.sumOf { it * it })
+            return added
         }
 
         fun toGroup(affinity: (String) -> Double): StoryGroup {
