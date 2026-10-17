@@ -14,6 +14,7 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
@@ -108,6 +109,9 @@ class FeedRepository(
             onProgress = ::onProgress,
             onLoaded = ::onLoaded,
         )
+
+    /** True while a load of the followed feeds runs (the start, a refresh or a retry). */
+    val isLoading: StateFlow<Boolean> get() = coordinator.isRunning
 
     /** The feed. The first collection triggers the cache-first start. */
     val feed: Flow<FeedState> =

@@ -74,7 +74,7 @@ private const val ALL_FILTERED_BODY =
 private const val OFFLINE_EMPTY_BODY =
     "New articles load as soon as you’re connected again. Articles you saved for later are still in Saved."
 
-/** The pull-to-refresh panel: the `LoadingBoard` tiles with 12 above and below. */
+/** The pull-to-refresh panel: the board-high "Refreshing your feed…" line with 12 above and below. */
 private val REFRESH_PANEL_HEIGHT =
     NewzTokens.tileSize.height + NewzTokens.spaceXs + NewzTokens.space2xs + NewzTokens.spaceM * 2
 
@@ -116,8 +116,8 @@ private fun FeedCard.info(): FeedCardInfo {
  * The feed (design `feed`): `AppBarMain` with Saved and Settings, then a list whose first item
  * is the `TopicChipRow` (it scrolls away), then `ArticleCard`s, with every drawn state: first
  * load, filter active / empty, end of feed, all filtered, offline with cache and offline empty.
- * Pull to refresh slides the `LoadingBoard` tiles down on a `paper` panel and moves the list down
- * below it. ⋮ and a long-press open [CardMenuSheet],
+ * Pull to refresh slides "Refreshing your feed…" down on a `paper` panel and moves the list down
+ * below it; the app-bar wordmark tiles flip while the feed loads or refreshes. ⋮ and a long-press open [CardMenuSheet],
  * whose Mute a keyword… opens [KeywordMuteSheet]. A card removed by an action collapses out
  * (`card-collapse`). The Undo `Snackbar` host lives here.
  */
@@ -135,6 +135,7 @@ fun FeedScreen(
     val prefs by viewModel.prefs.collectAsState()
     val selection by viewModel.selection.collectAsState()
     val refreshing by viewModel.refreshing.collectAsState()
+    val busy by viewModel.busy.collectAsState()
     val message by viewModel.message.collectAsState()
     var openGroup by remember { mutableStateOf<StoryGroup?>(null) }
     var menuCardId by remember { mutableStateOf<String?>(null) }
@@ -146,7 +147,7 @@ fun FeedScreen(
 
     Box(Modifier.fillMaxSize().background(c.paper)) {
         Column(Modifier.fillMaxSize()) {
-            AppBarMain(onSaved = onOpenSaved, onSettings = onOpenSettings)
+            AppBarMain(onSaved = onOpenSaved, onSettings = onOpenSettings, busy = busy)
             val pullState = rememberPullToRefreshState()
             // The pull reveals a `paper` panel holding the tiles from under the app bar and pushes
             // the list (chips first) down by as much, so the tiles never sit on the chips.
@@ -169,7 +170,7 @@ fun FeedScreen(
                                 .testTag(FeedSemantics.REFRESH_PANEL_TAG),
                             contentAlignment = Alignment.Center,
                         ) {
-                            LoadingBoard(label = null)
+                            PlainText(text = "Refreshing your feed…", style = NewzTokens.typeRowTitle, color = c.ink)
                         }
                     }
                 },

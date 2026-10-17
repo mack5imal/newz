@@ -10,10 +10,12 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -113,7 +115,7 @@ class FeedScreenTest {
     }
 
     @Test
-    fun pullToRefreshTilesSlideInAboveTheChips() {
+    fun pullToRefreshPanelSlidesInAboveTheChips() {
         server.fill(itemsPerFeed = 2)
         TestApp.install(TestCatalog.build(server))
         TestPrefs.onboarded()
@@ -126,7 +128,7 @@ class FeedScreenTest {
                 .fetchSemanticsNode()
                 .positionInRoot.y
 
-        // Hold a pull past the refresh threshold: the tiles' panel slides in and pushes the chips down.
+        // Hold a pull past the refresh threshold: the panel slides in and pushes the chips down.
         val list = compose.onNodeWithTag(FeedSemantics.LIST_TAG)
         list.performTouchInput {
             down(Offset(centerX, top + 10f))
@@ -140,6 +142,11 @@ class FeedScreenTest {
                 .fetchSemanticsNode()
                 .positionInRoot.y
         assertTrue("panel shows ($panel)", panel.height > 0f)
+        // It says what is happening in words; the app-bar wordmark tiles carry the motion (B15).
+        compose
+            .onNode(hasText("Refreshing your feed…") and hasAnyAncestor(hasTestTag(FeedSemantics.REFRESH_PANEL_TAG)))
+            .assertIsDisplayed()
+        compose.onNode(hasText("Newz") and isHeading()).assertIsDisplayed()
         assertTrue("chips moved down: $chipTop -> $pulledChipTop", pulledChipTop > chipTop)
         assertTrue("panel ends above the chips: ${panel.bottom} <= $pulledChipTop", panel.bottom <= pulledChipTop + 1f)
         list.performTouchInput { up() }

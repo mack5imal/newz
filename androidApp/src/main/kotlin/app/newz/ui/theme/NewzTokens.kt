@@ -48,6 +48,9 @@ data class NewzPalette(
     val lineSubtle: Color,
     val strip: Color,
     val tile: Color,
+    val wordmarkTile: Color,
+    val wordmarkLetter: Color,
+    val wordmarkRule: Color,
     val imagePlaceholder: Color,
     val imageHatch: Color,
     val button: Color,
@@ -76,6 +79,9 @@ object NewzColors {
             lineSubtle = Color(0xFFB3C3D9),
             strip = Color(0xFF1D3A5F),
             tile = Color(0xFF33557F),
+            wordmarkTile = Color(0xFFDCE5F2),
+            wordmarkLetter = Color(0xFF1D3A5F),
+            wordmarkRule = Color(0xFF6F8DB5),
             imagePlaceholder = Color(0xFFC5D3E6),
             imageHatch = Color(0xFFB8C8DD),
             button = Color(0xFF1D3A5F),
@@ -103,6 +109,9 @@ object NewzColors {
             lineSubtle = Color(0xFF36597F),
             strip = Color(0xFF142A47),
             tile = Color(0xFF2E5283),
+            wordmarkTile = Color(0xFFDCE5F2),
+            wordmarkLetter = Color(0xFF1D3A5F),
+            wordmarkRule = Color(0xFF6F8DB5),
             imagePlaceholder = Color(0xFF2C4D78),
             imageHatch = Color(0xFF33568A),
             button = Color(0xFFDCE5F2),
@@ -307,6 +316,7 @@ object NewzTokens {
     val panelHeaderHeight = 40.dp
     val tileSize = DpSize(24.dp, 32.dp)
     val tileSizeSmall = DpSize(18.dp, 24.dp)
+    val tileSizeWordmark = DpSize(28.dp, 38.dp)
     val tileGap = 3.dp
     val imageRatio = 16f / 9f
     val noImageHeight = 104.dp

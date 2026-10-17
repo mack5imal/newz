@@ -31,6 +31,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasNoClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.TextLayoutResult
@@ -53,6 +54,7 @@ import app.newz.ui.components.CardStrip
 import app.newz.ui.components.Checkbox
 import app.newz.ui.components.FlapAge
 import app.newz.ui.components.FlapTile
+import app.newz.ui.components.FlapWordmark
 import app.newz.ui.components.GroupButton
 import app.newz.ui.components.IconButton
 import app.newz.ui.components.ListRow
@@ -85,6 +87,7 @@ import app.newz.ui.components.TopicTiles
 import app.newz.ui.theme.LocalNewzPalette
 import app.newz.ui.theme.NewzIcons
 import app.newz.ui.theme.NewzTheme
+import app.newz.ui.theme.NewzTokens
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -306,6 +309,34 @@ class ComponentGalleryTest {
     }
 
     @Test
+    fun wordmarkSpellsNewzInTilesAndReadsAsOneHeading() {
+        setGallery {
+            Column {
+                Box(Modifier.testTag(TAG_WORDMARK)) { FlapWordmark(busy = false) }
+                Box(Modifier.testTag(TAG_WORDMARK_BUSY)) { FlapWordmark(busy = true) }
+            }
+        }
+        // Spoken once as the heading "Newz"; the four tiles are hidden behind it.
+        composeRule.onNode(hasText("Newz") and isHeading() and hasAnyAncestor(hasTestTag(TAG_WORDMARK))).assertExists()
+        composeRule.onAllNodes(hasAnyAncestor(hasTestTag(TAG_WORDMARK)) and hasTextLayout()).assertCountEquals(0)
+        val tiles = lettersIn(TAG_WORDMARK)
+        assertEquals("NEWZ", tiles.joinToString("") { it.text })
+        val width = with(composeRule.density) { NewzTokens.tileSizeWordmark.width.toPx() }
+        assertTrue(
+            "tiles ${tiles.first().right - tiles.first().left} wide <= $width",
+            tiles.all {
+                it.right - it.left <=
+                    width + 1f
+            },
+        )
+        // Busy: still four tiles under the same label (the letters flip while composed).
+        assertEquals(4, lettersIn(TAG_WORDMARK_BUSY).size)
+        composeRule
+            .onNode(hasText("Newz") and isHeading() and hasAnyAncestor(hasTestTag(TAG_WORDMARK_BUSY)))
+            .assertExists()
+    }
+
+    @Test
     fun failedImageLoadShowsTheDecorativeTopicPanel() {
         setGallery {
             Column {
@@ -500,6 +531,8 @@ class ComponentGalleryTest {
         const val NO_IMAGE_HEIGHT = 104
         const val IMAGE_TIMEOUT_MS = 5_000L
         const val TAG_ROW_SHORT = "tiles-short"
+        const val TAG_WORDMARK = "wordmark"
+        const val TAG_WORDMARK_BUSY = "wordmark-busy"
         const val TAG_ROW_TWO_WORDS = "tiles-two-words"
         const val TAG_ROW_SMALL = "tiles-small"
         const val TAG_ROW_CUT = "tiles-cut"

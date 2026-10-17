@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.semantics
 import app.newz.catalog.Catalog
 import app.newz.ui.components.AppIcon
 import app.newz.ui.components.BottomActionBar
+import app.newz.ui.components.FlapWordmark
 import app.newz.ui.components.PlainText
 import app.newz.ui.components.SplitRule
 import app.newz.ui.components.TopicChip
@@ -150,7 +151,7 @@ private fun OnboardingHeader() {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AppIcon()
-                SignageText(text = "Newz", style = NewzTokens.typeWordmarkOnboarding, color = c.sky)
+                FlapWordmark(busy = false, heading = false)
             }
             PlainText(
                 text = "News that stays on your phone.",

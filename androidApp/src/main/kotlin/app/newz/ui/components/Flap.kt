@@ -23,10 +23,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.sp
 import app.newz.ui.theme.NewzTokens
 
@@ -34,17 +39,25 @@ import app.newz.ui.theme.NewzTokens
  * `FlapTile` — the split-flap character: a `tile` rectangle, 24×32 (18×24 [small]),
  * `radius-control`, a centred `type-tile` character in `sky` and a 2 dp `strip` line across it
  * 15 dp from the top (11 on small tiles). Live text, drawn at a fixed size so it always fits the
- * tile. A blank [text] draws an empty tile.
+ * tile. A blank [text] draws an empty tile. [size] overrides the tile size (the character and
+ * the rule scale with its height); [fill], [letter] and [rule] override the colours.
  */
 @Composable
 fun FlapTile(
     text: String,
     modifier: Modifier = Modifier,
     small: Boolean = false,
+    size: DpSize = if (small) NewzTokens.tileSizeSmall else NewzTokens.tileSize,
+    fill: Color = palette().tile,
+    letter: Color = palette().sky,
+    rule: Color = palette().strip,
 ) {
-    val c = palette()
-    val size = if (small) NewzTokens.tileSizeSmall else NewzTokens.tileSize
-    val ruleOffset = if (small) NewzTokens.tileRuleOffsetSmall else NewzTokens.tileRuleOffset
+    val ruleOffset =
+        when (size) {
+            NewzTokens.tileSize -> NewzTokens.tileRuleOffset
+            NewzTokens.tileSizeSmall -> NewzTokens.tileRuleOffsetSmall
+            else -> NewzTokens.tileRuleOffset * (size.height / NewzTokens.tileSize.height)
+        }
     val base = NewzTokens.typeTile.textStyle
     val ratio = size.height / NewzTokens.tileSize.height
     // Tiles have a fixed size, so the character ignores both text-size settings.
@@ -67,12 +80,12 @@ fun FlapTile(
                 .width(IntrinsicSize.Max)
                 .widthIn(min = size.width)
                 .clip(ControlShape)
-                .background(c.tile),
+                .background(fill),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = text.uppercase(),
-            color = c.sky,
+            color = letter,
             style = style,
             textAlign = TextAlign.Center,
             softWrap = false,
@@ -84,7 +97,7 @@ fun FlapTile(
                 .offset(y = ruleOffset)
                 .fillMaxWidth()
                 .height(NewzTokens.rule)
-                .background(c.strip),
+                .background(rule),
         )
     }
 }
@@ -142,6 +155,58 @@ internal fun boardLetter(
     return ALPHABET[pos]
 }
 
+/** The board's step, advancing one letter per `flap-flip` and repeating while it is composed. */
+@Composable
+private fun rememberBoardStep(): Int {
+    val transition = rememberInfiniteTransition(label = "loading-board")
+    val step by transition.animateValue(
+        initialValue = 0,
+        targetValue = CYCLE_STEPS,
+        typeConverter = Int.VectorConverter,
+        animationSpec = infiniteRepeatable(tween(CYCLE_STEPS * NewzTokens.flapFlip, easing = LinearEasing)),
+        label = "loading-board-step",
+    )
+    return step
+}
+
+/**
+ * `FlapWordmark` — the "Newz" wordmark in the app bar and the onboarding header: four
+ * [FlapTile]s spelling N E W Z at `tile-size-wordmark` (28×38), gap 3: a `wordmark-tile` (`sky`)
+ * face, a `wordmark-letter` (`navy`) letter and a `wordmark-rule` split line, the app icon's tile
+ * turned over so it stands out on the navy bar in both themes. While [busy] (the feed is loading or refreshing) the tiles flip through
+ * letters back to NEWZ like the `LoadingBoard`; otherwise they stay still. Read as the [label]
+ * "Newz", a heading when [heading] (the app bar).
+ */
+@Composable
+fun FlapWordmark(
+    busy: Boolean,
+    modifier: Modifier = Modifier,
+    label: String = "Newz",
+    tileSize: DpSize = NewzTokens.tileSizeWordmark,
+    heading: Boolean = true,
+) {
+    val c = palette()
+    val step = if (busy) rememberBoardStep() else CYCLE_STEPS
+    Row(
+        modifier =
+            modifier.clearAndSetSemantics {
+                text = AnnotatedString(label)
+                if (heading) heading()
+            },
+        horizontalArrangement = Arrangement.spacedBy(NewzTokens.tileGap),
+    ) {
+        BOARD_WORD.indices.forEach {
+            FlapTile(
+                text = boardLetter(it, step).toString(),
+                size = tileSize,
+                fill = c.wordmarkTile,
+                letter = c.wordmarkLetter,
+                rule = c.wordmarkRule,
+            )
+        }
+    }
+}
+
 /**
  * `LoadingBoard` — the loading indicator: four [FlapTile]s that flip through letters, one per
  * `flap-flip`, until they spell "NEWZ", then repeat; beside them the `type-row-title` [label]
@@ -153,14 +218,7 @@ fun LoadingBoard(
     modifier: Modifier = Modifier,
 ) {
     val c = palette()
-    val transition = rememberInfiniteTransition(label = "loading-board")
-    val step by transition.animateValue(
-        initialValue = 0,
-        targetValue = CYCLE_STEPS,
-        typeConverter = Int.VectorConverter,
-        animationSpec = infiniteRepeatable(tween(CYCLE_STEPS * NewzTokens.flapFlip, easing = LinearEasing)),
-        label = "loading-board-step",
-    )
+    val step = rememberBoardStep()
     Row(
         modifier =
             modifier.padding(

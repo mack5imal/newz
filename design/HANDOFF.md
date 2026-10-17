@@ -67,6 +67,9 @@ Colours are written `light · dark`. A token that is the same in both themes has
 | `line-subtle` | light `#B3C3D9` · dark `#36597F` | 1 dp list and sheet dividers; sheet grabber (light) |
 | `strip` | light `#1D3A5F` · dark `#142A47` | card header strip, panel header, no-image panel, offline banner, board panels, line across flap tiles |
 | `tile` | light `#33557F` · dark `#2E5283` | flap-tile face (age, loader, rank) |
+| `wordmark-tile` | `#DCE5F2` | face of the `FlapWordmark` tiles (B15) |
+| `wordmark-letter` | `#1D3A5F` | letters on the `FlapWordmark` tiles |
+| `wordmark-rule` | `#6F8DB5` | line across the `FlapWordmark` tiles |
 | `image-placeholder` | light `#C5D3E6` · dark `#2C4D78` | article image area before the image loads or if it fails |
 | `image-hatch` | light `#B8C8DD` · dark `#33568A` | 1 dp lines at 135°, every 11 dp (every 9 dp on `SavedCard` thumbnails), over `image-placeholder` |
 | `button` | light `#1D3A5F` · dark `#DCE5F2` | primary button fill, selected chip, selected segment, switch on, checkbox on |
@@ -95,7 +98,7 @@ Sizes and line heights are in sp, tracking is in em, and "caps" means uppercase 
 
 | name | value | usage |
 |---|---|---|
-| `type-wordmark` | signage 800 · 40/40 · +0.04 · caps | "Newz" in the feed app bar (46/46 on onboarding) |
+| `type-wordmark` | signage 800 · 40/40 · +0.04 · caps | the drawn "Newz" text wordmark (46/46 on onboarding); since B15 the app shows the `FlapWordmark` tiles instead |
 | `type-screen-title` | signage 800 · 28/30 · +0.04 · caps | sub-screen app-bar titles |
 | `type-sheet-title` | signage 800 · 28/30 · +0.03 · caps | sheet titles ("Mute a keyword") |
 | `type-state-title` | signage 800 · 34/36 · +0.02 · caps | empty, error and info panels; 30/33 for the three longer titles on `feed--all-filtered`, `search--no-feed` and `search--not-address` |
@@ -126,7 +129,7 @@ Sizes and line heights are in sp, tracking is in em, and "caps" means uppercase 
 | `text-scale-signage` | Small 0.9 · Default 1.0 · Large 1.12 · Extra large 1.25 | multiplies signage styles in content: outlet, chips, tiles, buttons, panel headers |
 
 How text scaling behaves:
-- The app-bar wordmark and app-bar nav buttons don't scale.
+- The app-bar wordmark (flap tiles) and app-bar nav buttons don't scale.
 - All sizes are in sp, so the in-app setting stacks with the system font scale.
 - At any scale, containers grow and text wraps; nothing is truncated or ellipsised, up to 200% system font size.
 - At Extra large (`feed--long-headline-xl.png`):
@@ -160,6 +163,7 @@ How text scaling behaves:
 | `sheet-row-height` | 56 min | sheet action rows |
 | `panel-header-height` | 40 min | panel header strip |
 | `tile-size` | 24×32 (small 18×24), gap 3 | flap tiles |
+| `tile-size-wordmark` | 28×38, gap 3 | `FlapWordmark` tiles (rule 18 dp from the top) |
 | `image-ratio` | 16:9, full card width | article image (218 dp at a 388 dp card) |
 | `no-image-height` | 104 | no-image panel |
 | `thumb-size` | 72 | Saved-list thumbnail |
@@ -187,7 +191,7 @@ How text scaling behaves:
 
 | name | value | usage |
 |---|---|---|
-| `flap-flip` | 180 ms per character, ease-in; top half drops past the line | loading board, pull to refresh, age tiles updating after a refresh |
+| `flap-flip` | 180 ms per character, ease-in; top half drops past the line | loading board, app-bar wordmark while loading or refreshing, age tiles updating after a refresh |
 | `sheet` | 250 ms, standard decelerate | bottom sheets in and out |
 | `card-collapse` | 200 ms height collapse | card removed after Hide / Don't show |
 | `snackbar-timeout` | 6 s | Undo bar stays this long, then dismisses |
@@ -245,7 +249,7 @@ How to draw them:
 
 Each entry gives what the component is, where it appears, and its exact measurements. Sizes are in dp.
 
-- `AppBarMain` — the feed's app bar (`feed`): `type-wordmark` "Newz" at the left and `NavButton`s Saved and Settings at the right, in a 64 dp row with padding 0 4 0 16 below `status-inset`; light uses a `navy` background, dark uses `paper` with a 2 dp `sky` bottom rule.
+- `AppBarMain` — the feed's app bar (`feed`): the `FlapWordmark` "Newz" at the left and `NavButton`s Saved and Settings at the right, in a 64 dp row with padding 0 4 0 16 below `status-inset`; light uses a `navy` background, dark uses `paper` with a 2 dp `sky` bottom rule.
 - `AppBarSub` — the app bar on every other full screen (`settings*`, `saved`, `search`, `suggestions`, `backup`): a back `IconButton` and `type-screen-title` in a 64 dp row with padding 0 8 0 4, an optional trailing `NavButton` ("Add" on `settings-sources`) or a `SearchField` in place of the title (`search`); same colours as `AppBarMain`.
 - `SplitRule` — under every app bar in light theme only: a 2 dp `paper` gap, then a 2 dp `navy` line, echoing the line across the flap tiles; dark has no rule here, because its app bar carries the `sky` bottom rule.
 - `NavButton` — the text buttons in app bars (Saved, Settings, Add): 48 dp tall, padding 0 10, a 20 dp icon, gap 6, and `type-nav`, all in `sky`.
@@ -256,6 +260,7 @@ Each entry gives what the component is, where it appears, and its exact measurem
 - `CardStrip` — the header band of `ArticleCard`: `strip`, min height 48, padding 0 8 0 14, gap 12; the outlet name is in `type-outlet` `sky` (it wraps and is never truncated) with `FlapAge` at the right; at Extra large it gets 10 dp of top and bottom padding and the tiles top-align.
 - `FlapAge` — the article age in `CardStrip`, `StoryRow` and `SavedCard`: one `FlapTile` per character of the age string ("now", "5m", "3h", "2d"), gap 3; it is spoken as a single label, e.g. "2 hours ago".
 - `FlapTile` — the split-flap character used by `FlapAge`, `LoadingBoard`, `RankTile`, `NoImagePanel` and the END board: a `tile` rectangle, 24×32 (18×24 small), `radius-control`, with a centred `type-tile` character in `sky` and a 2 dp `strip` line across it 15 dp from the top (11 on small tiles); build it from live text, not images.
+- `FlapWordmark` — the "Newz" wordmark in `AppBarMain` and the onboarding header (B15): four `FlapTile`s spelling N E W Z at `tile-size-wordmark` (28×38, gap 3) with a `wordmark-tile` face, `wordmark-letter` letters and a `wordmark-rule` line (the app icon's tile turned over), the same in both themes. Spoken as the heading "Newz". While the feed loads or refreshes (first load, pull to refresh, the load on opening the app) the tiles flip through letters back to NEWZ as on the `LoadingBoard`, one letter per `flap-flip`; otherwise they stay still. It doesn't scale with text size.
 - `ArticleImage` — the article photo in `ArticleCard`: full card width at 16:9 (218 dp on a 388 dp card), cropped to fill and anchored a quarter of the way down (vertical bias −0.5), so a tall photo keeps its upper part (faces) and a wide one crops its sides evenly; the Saved thumbnail crops the same way; it shows `image-placeholder` with `image-hatch` lines every 11 dp until it loads; if loading fails, the image host is blocked, or the picture's source is under 300 px wide (a feed thumbnail that would look blocky stretched to the card), it is replaced by the `NoImagePanel`, so an unusable picture looks the same as none; it is the only thing fetched from an article's site, unless Better pictures is on: then a card whose feed picture is missing or under 300 px wide reads the first 64 KB of its article's page for an `og:image` (or `twitter:image`), shows the `NoImagePanel` until that picture arrives, and keeps the panel when the page has none, names only a tiny one, or names the same image as two or more other articles of the outlet (its logo).
 - `NoImagePanel` — replaces `ArticleImage` when an article has no picture: none in the feed, or one that failed to load (`feed.png`, second card): a 104 dp `strip` panel with the article's first topic spelled in `FlapTile`s (gap 3; a space is a blank tile-wide gap), centred across the panel (at least 12 from each side) and top to bottom (B14). If the word doesn't fit at full size (24×32) it uses small tiles (18×24); if it still doesn't fit it is cut after the last whole letter that fits. Like every tile, the letters keep their size at every text size. Decorative and hidden from screen readers.
 - `CardActions` — the bottom row of `ArticleCard`: 64 tall, padding 0 4 0 12, with a `GroupButton` at the left on grouped cards only and Share and ⋮ `IconButton`s at the right.
@@ -266,7 +271,7 @@ Each entry gives what the component is, where it appears, and its exact measurem
 - `OfflineBanner` — the offline notice on `feed--offline-saved` and `saved--offline`: a band with 12 side margins, margin-bottom 14, padding 6 6 6 14 and gap 12; it has a `strip` background, a 22 dp `icon-wifi-off`, the message in 600 15/20 and a `SnackbarAction` "Retry", all in `sky`.
 - `StatePanel` — every empty, error and info panel (feed filter-empty, all-filtered and offline-empty, the empty states, search no-feed and not-address): a `card` block with margin 4 12 14 (so it sits 18 below the app bar) and padding 28 20 24; it holds an optional 40 dp icon in `ink` (in `alert` for errors) with 16 below, a `type-state-title`, `type-body` in `ink-muted` with 10 above, and an optional `Button` with 20 above.
 - `BoardPanel` — a `StatePanel` on a `strip` background with title, body, icon and outline-button borders in `sky`: used for the end of `feed` (three `FlapTile`s spelling "END", 18 above the title) and for the Google refusal in `search`.
-- `LoadingBoard` — the loading indicator on `feed--loading`: a row with padding 4 4 2 and gap 14, holding four `FlapTile`s that flip through letters until they spell "NEWZ" and then repeat, beside `type-row-title` "Loading today’s news…"; the tiles alone are the pull-to-refresh indicator.
+- `LoadingBoard` — the loading indicator on `feed--loading`: a row with padding 4 4 2 and gap 14, holding four `FlapTile`s that flip through letters until they spell "NEWZ" and then repeat, beside `type-row-title` "Loading today’s news…" (first load).
 - `SkeletonCard` — the placeholder cards on `feed--loading`, hidden from screen readers: an `ArticleCard` shape whose strip holds a 12 dp bar in `tile` and blank `FlapTile`s, whose headline area (padding 18 16, gap 10) holds 16 dp bars in `image-placeholder`, followed by a plain `image-placeholder` image block and an empty 64 dp actions area.
 - `BottomSheet` — the container for `card-menu`, `keyword-mute` and `story-group`: a `card` surface with `radius-sheet` over `scrim`, with a 40×4 grabber (`line-subtle` in light, `line` in dark) 10 from the top and 4 above the content; it is dismissed by a swipe down, a tap on the scrim, or Back.
 - `SheetActionRow` — each action in `card-menu`: min height 56, padding 0 20, a 22 dp icon in `icon`, gap 16, and the label in `type-row-title` at weight 500; the disabled variant turns label and icon `ink-muted`, adds an explanation line in `type-row-sub` 600 `ink`, and can't be tapped.
@@ -307,7 +312,7 @@ Interactions:
 - "+n sources" opens `story-group`.
 - Saved opens `saved`; Settings opens `settings`.
 - Tapping a chip toggles it, and several can be selected. With any chip selected, the feed shows only articles in those topics.
-- Pull to refresh slides a `paper` panel holding a `LoadingBoard` (4 tiles, no text, 12 above and below) down from under the app bar with the pull, and moves the list (chip row first) down by as much, so the tiles never cover the chips; it stays until new articles are merged in. Age tiles that change flip.
+- Pull to refresh slides a `paper` panel holding the line "Refreshing your feed…" (`type-row-title` in `ink`, centred, 12 above and below) down from under the app bar with the pull, and moves the list (chip row first) down by as much, so the panel never covers the chips; it stays until new articles are merged in, while the app-bar `FlapWordmark` tiles flip (B15). Age tiles that change flip.
 
 States:
 - `feed.png` (populated) — a grouped card ("+3 sources") and a card with no image (`NoImagePanel` showing the topic); a third card starts below the bottom edge.
@@ -410,7 +415,7 @@ States:
 
 Shown on first launch only. Layout:
 - A header band in `navy`, with 20 dp side padding and 22 dp bottom padding:
-  - 18 dp below the status inset, the app icon at 56 dp beside the wordmark at 46/46 sp, gap 14. The icon is its 72 dp visible area scaled to 56 dp, with corners rounded at 16/72 of its size (about 12 dp).
+  - 18 dp below the status inset, the app icon at 56 dp beside the wordmark, gap 14 (since B15 the still `FlapWordmark` tiles, not spoken as a heading; drawn as text at 46/46 sp before). The icon is its 72 dp visible area scaled to 56 dp, with corners rounded at 16/72 of its size (about 12 dp).
   - 18 dp below that, `type-heading` "News that stays on your phone."; 8 dp below, the privacy sentence in `type-body`. Both are in `sky`.
 - Then `SplitRule`, then 18 16 padding, the label "Pick at least 3 topics", and 20 `TopicChip`s in a wrap with gap 8.
 - `BottomActionBar` pinned at the bottom.
@@ -667,6 +672,7 @@ Strings are exact. Signage-styled text (see `font-signage`) displays in capitals
 - `Share` (spoken)
 - `More actions` (spoken)
 - `Loading today’s news…`
+- `Refreshing your feed…` (pull-to-refresh panel, B15)
 - `Showing {topics}` (e.g. `Showing Science and Climate`; three or more: `Science, Climate and Tech`)
 - `Clear filter`
 - `No {topic} articles right now` (e.g. `Health`; several selected: `Health or Space`)

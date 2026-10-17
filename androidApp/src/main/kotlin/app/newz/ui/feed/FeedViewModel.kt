@@ -105,6 +105,12 @@ class FeedViewModel(
     private val refreshingState = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = refreshingState.asStateFlow()
 
+    /** True while the feed loads or refreshes: the app-bar wordmark flips meanwhile. */
+    val busy: StateFlow<Boolean> =
+        combine(refreshingState, repository.isLoading, servedFeed) { refreshing, loading, state ->
+            refreshing || loading || state is FeedState.Loading
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
     private val messageState = MutableStateFlow<FeedMessage?>(null)
     val message: StateFlow<FeedMessage?> = messageState.asStateFlow()
 

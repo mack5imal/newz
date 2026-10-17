@@ -56,26 +56,22 @@ private fun AppBarSurface(
 }
 
 /**
- * `AppBarMain` — the feed's app bar: the "Newz" wordmark at the left and the Saved and
- * Settings [NavButton]s at the right, in a 64 dp row below the status bar.
+ * `AppBarMain` — the feed's app bar: the [FlapWordmark] "Newz" at the left and the Saved and
+ * Settings [NavButton]s at the right, in a 64 dp row below the status bar. While [busy] (the feed
+ * is loading or refreshing) the wordmark tiles flip.
  */
 @Composable
 fun AppBarMain(
     onSaved: () -> Unit,
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    busy: Boolean = false,
     wordmark: String = "Newz",
     savedLabel: String = "Saved",
     settingsLabel: String = "Settings",
 ) {
-    val c = palette()
     AppBarSurface(modifier, paddingStart = NewzTokens.spaceL, paddingEnd = NewzTokens.spaceXs) {
-        SignageText(
-            text = wordmark,
-            style = NewzTokens.typeWordmark,
-            color = c.sky,
-            modifier = Modifier.weight(1f).semantics { heading() },
-        )
+        Box(Modifier.weight(1f)) { FlapWordmark(busy = busy, label = wordmark) }
         NavButton(label = savedLabel, icon = NewzIcons.iconBookmark, onClick = onSaved)
         NavButton(label = settingsLabel, icon = NewzIcons.iconSettings, onClick = onSettings)
     }
