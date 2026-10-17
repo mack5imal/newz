@@ -10,8 +10,16 @@ import app.newz.net.HostGuard
 object HtmlSanitizer {
     private val SCRIPT_BLOCK = Regex("<script\\b[\\s\\S]*?</script\\s*>", RegexOption.IGNORE_CASE)
     private val SCRIPT_TAG = Regex("</?script\\b[^>]*>", RegexOption.IGNORE_CASE)
+
+    // Quote-aware, so a `>` inside a quoted attribute value does not end the tag early. As in
+    // the HTML tokenizer, a quote opens a value only right after `=`; any other quote (alt=it's)
+    // is plain text. Each alternative starts differently, so matching stays linear.
     private val MEDIA_TAG =
-        Regex("<(img|iframe|embed|object|video|audio|source)\\b([^>]*)>", RegexOption.IGNORE_CASE)
+        Regex(
+            "<(img|iframe|embed|object|video|audio|source)\\b" +
+                "((?:=\\s*\"[^\"]*\"|=\\s*'[^']*'|=(?!\\s*[\"'])|[^=>])*)>",
+            RegexOption.IGNORE_CASE,
+        )
     private val ATTRIBUTE =
         Regex("([A-Za-z_:][\\w:.-]*)\\s*=\\s*(\"([^\"]*)\"|'([^']*)'|([^\\s\"'>]+))")
     private val URL_ATTRIBUTES = setOf("src", "srcset", "data", "poster", "data-src", "data-srcset")

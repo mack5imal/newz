@@ -49,6 +49,23 @@ class HtmlSanitizerTest {
     }
 
     @Test
+    fun quotedGreaterThanDoesNotHideBlockedSrc() {
+        val out =
+            HtmlSanitizer.sanitize(
+                "<p>a</p><img alt=\"Profit > cost\" src=\"https://lh3.googleusercontent.com/a.jpg\"><p>b</p>",
+            )
+        assertFalse("googleusercontent" in out, out)
+        assertFalse("<img" in out, out)
+        assertEquals("<p>a</p><p>b</p>", out)
+        val kept = "<img alt=\"a > b\" src=\"https://example.com/a.jpg\">"
+        assertEquals(kept, HtmlSanitizer.sanitize(kept))
+        val single = "<img alt='x > y' src='https://i.ytimg.com/a.jpg'>"
+        assertEquals("", HtmlSanitizer.sanitize(single))
+        val stray = "<img alt=it's src=\"https://lh3.googleusercontent.com/a.jpg\">"
+        assertEquals("", HtmlSanitizer.sanitize(stray))
+    }
+
+    @Test
     fun keepsRelativeAndPublisherMedia() {
         val html = "<img src=\"/images/a.png\"><iframe src=\"https://player.vimeo.example/1\"></iframe>"
         assertEquals(html, HtmlSanitizer.sanitize(html))

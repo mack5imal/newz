@@ -77,6 +77,26 @@ class NewzHttpClientTest {
         }
 
     @Test
+    fun redirectToPercentEncodedGoogleHostIsRefused() =
+        runTest {
+            val engine =
+                MockEngine { request ->
+                    if (request.url.host == "publisher.example") {
+                        respond(
+                            "",
+                            HttpStatusCode.MovedPermanently,
+                            headersOf(HttpHeaders.Location, "https://%66eedproxy.google.com/x"),
+                        )
+                    } else {
+                        respond("should never be reached")
+                    }
+                }
+            val client = newzHttpClient(engine)
+            assertFailsWith<BlockedHostException> { client.fetchCapped("https://publisher.example/feed") }
+            assertEquals(listOf("publisher.example"), engine.requestHistory.map { it.url.host })
+        }
+
+    @Test
     fun blockedInitialUrlNeverReachesEngine() =
         runTest {
             val engine = MockEngine { respond("x") }

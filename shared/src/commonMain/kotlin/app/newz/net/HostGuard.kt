@@ -66,9 +66,11 @@ object HostGuard {
      * ASCII forms first, as IDNA mapping does. Returns null when the host cannot be encoded.
      */
     internal fun normalizeHost(host: String): String? {
+        val decoded = percentDecode(host.trim()) ?: return null
+        if (!isValidHostSyntax(decoded)) return null
         val mapped =
             buildString {
-                for (c in host.trim()) {
+                for (c in decoded) {
                     append(
                         when (c) {
                             '。', '．', '｡' -> '.'
@@ -85,8 +87,55 @@ object HostGuard {
             }.joinToString(".")
     }
 
+    /**
+     * Decodes `%XX` escapes as UTF-8, as OkHttp does before it connects, so `%67oogle.com`
+     * is matched as `google.com`. Returns null for a malformed escape or invalid UTF-8.
+     */
+    private fun percentDecode(host: String): String? {
+        if ('%' !in host) return host
+        val bytes = ArrayList<Byte>(host.length)
+        var i = 0
+        while (i < host.length) {
+            val c = host[i]
+            if (c == '%') {
+                val hex = if (i + 3 <= host.length) host.substring(i + 1, i + 3) else return null
+                val value = hex.toIntOrNull(16)
+                if (value == null || hex.any { it == '+' || it == '-' }) return null
+                bytes.add(value.toByte())
+                i += 3
+            } else {
+                c.toString().encodeToByteArray().forEach { bytes.add(it) }
+                i++
+            }
+        }
+        return try {
+            bytes.toByteArray().decodeToString(throwOnInvalidSequence = true)
+        } catch (_: CharacterCodingException) {
+            null
+        }
+    }
+
+    /**
+     * False when [host] holds a character OkHttp refuses in a host (controls, space, and
+     * `"#%/:?@[\]`) — so a host that survives decoding with a stray `%` is blocked. A bracketed
+     * IPv6 literal is allowed.
+     */
+    private fun isValidHostSyntax(host: String): Boolean {
+        if (host.length > 2 && host.startsWith("[") && host.endsWith("]")) {
+            return host.substring(1, host.length - 1).all { it.isLetterOrDigit() || it == ':' || it == '.' }
+        }
+        return host.none { it.code <= 0x20 || it.code == 0x7f || it in INVALID_HOST_CHARS }
+    }
+
+    private const val INVALID_HOST_CHARS = "\"#%/:?@[\\]"
+
+    /** Google's brand registry TLDs: any host under them (or the bare TLD) is Google's. */
+    private val GOOGLE_BRAND_TLDS =
+        setOf("google", "goog", "youtube", "gle", "android", "chrome", "gmail", "googl")
+
     private fun isGoogleTldHost(host: String): Boolean {
         val labels = host.split('.')
+        if (labels.last() in GOOGLE_BRAND_TLDS) return true
         for (i in labels.indices) {
             if (labels[i] != "google") continue
             val rest = labels.subList(i + 1, labels.size)

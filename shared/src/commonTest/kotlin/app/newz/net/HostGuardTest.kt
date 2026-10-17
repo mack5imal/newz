@@ -99,6 +99,37 @@ class HostGuardTest {
     }
 
     @Test
+    fun percentEncodedHostsAreDecodedBeforeMatching() {
+        assertTrue(HostGuard.isBlocked("https://%67oogle.com/x"))
+        assertTrue(HostGuard.isBlocked("https://www.google.com%2e/x"))
+        assertTrue(HostGuard.isBlocked("https://lh3.googleusercontent%2ecom/x"))
+        assertTrue(HostGuard.isBlocked("https://%zz.example/"))
+        assertTrue(HostGuard.isBlocked("https://%ff.example/"))
+        assertTrue(HostGuard.isBlocked("https://%2567oogle.com/x"))
+        assertFalse(HostGuard.isBlocked("https://%62bc.co.uk/news"))
+        assertFalse(HostGuard.isBlocked("https://b%C3%BCcher.example/feed"))
+        assertFalse(HostGuard.isBlocked("https://nytimes.com/"))
+        assertFalse(HostGuard.isBlocked("https://[2001:db8::1]:8443/feed"))
+    }
+
+    @Test
+    fun blocksGoogleBrandTlds() {
+        assertTrue(HostGuard.isBlocked("https://blog.google/rss/"))
+        assertTrue(HostGuard.isBlocked("https://about.google/"))
+        assertTrue(HostGuard.isBlocked("https://x.goog/"))
+        for (tld in listOf("google", "goog", "youtube", "gle", "android", "chrome", "gmail", "googl")) {
+            assertTrue(HostGuard.isBlockedHost("www.example.$tld"), tld)
+            assertTrue(HostGuard.isBlockedHost(tld), tld)
+        }
+        assertFalse(HostGuard.isBlocked("https://googleplex-fan.example/"))
+        assertFalse(HostGuard.isBlocked("https://notgoogle.com/"))
+        assertFalse(HostGuard.isBlocked("https://bbc.co.uk/news"))
+        assertFalse(HostGuard.isBlocked("https://nytimes.com/"))
+        assertFalse(HostGuard.isBlocked("https://bücher.example/feed"))
+        assertFalse(HostGuard.isBlocked("https://google.example.org/"))
+    }
+
+    @Test
     fun googleHostsListCoversSpecDomains() {
         for (host in specHosts.drop(1)) assertTrue(host in HostGuard.GOOGLE_HOSTS, host)
     }
