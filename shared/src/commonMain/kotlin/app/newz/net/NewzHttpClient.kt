@@ -12,6 +12,7 @@ import io.ktor.client.plugins.UserAgent
 import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.plugins.plugin
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.header
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpHeaders
@@ -24,6 +25,7 @@ import io.ktor.http.isSuccess
 import io.ktor.http.takeFrom
 import io.ktor.utils.io.InternalAPI
 import io.ktor.utils.io.readAvailable
+import kotlinx.coroutines.CancellationException
 
 /** Thrown before a request (or a redirect hop) to a host [HostGuard] blocks is sent. */
 class BlockedHostException(
@@ -171,21 +173,56 @@ suspend fun HttpClient.fetchCapped(
  * GETs [url] and returns only the first [maxBytes] bytes of the decoded body (all of it when it
  * is shorter), then stops: the rest is never read, and the response is closed. Used to read the
  * start of an article page without downloading the page.
+ *
+ * The request asks for just those bytes (`Range: bytes=0-{maxBytes - 1}`, kept on every
+ * redirect hop), so a server that honours it sends no more than that:
+ * - 206 Partial Content: the (possibly shorter) body is read as usual.
+ * - 200: the server ignored the range; reading still stops at [maxBytes] and the connection closes.
+ * - 416, 400 or 403 (statuses some servers give only to ranged requests): asked once more without
+ *   the range, and that answer stands.
+ * - A body that ends early while being decoded (the first bytes of a gzipped page cut mid-stream
+ *   end in "unexpected end of stream"): the bytes decoded so far are returned, not an error.
  */
 suspend fun HttpClient.fetchStart(
     url: String,
     maxBytes: Int,
+): FetchResult {
+    val ranged = readStart(url, maxBytes, ranged = true)
+    if (ranged is FetchResult.HttpError &&
+        ranged.status in RANGE_REFUSED
+    ) {
+        return readStart(url, maxBytes, ranged = false)
+    }
+    return ranged
+}
+
+/** Statuses a server may give a ranged request it won't serve; [fetchStart] then asks without the range. */
+private val RANGE_REFUSED = setOf(400, 403, 416)
+
+private suspend fun HttpClient.readStart(
+    url: String,
+    maxBytes: Int,
+    ranged: Boolean,
 ): FetchResult =
-    prepareGet(url).execute { response ->
+    prepareGet(url) {
+        if (ranged) header(HttpHeaders.Range, "bytes=0-${maxBytes - 1}")
+    }.execute { response ->
         if (!response.status.isSuccess()) return@execute FetchResult.HttpError(response.status.value)
         val channel = response.bodyAsChannel()
         val bytes = ByteArray(maxBytes)
         var total = 0
-        while (total < maxBytes) {
-            // Never asks for more than is still wanted, so no byte past the cap is read.
-            val read = channel.readAvailable(bytes, total, minOf(CHUNK_SIZE, maxBytes - total))
-            if (read < 0) break
-            total += read
+        try {
+            while (total < maxBytes) {
+                // Never asks for more than is still wanted, so no byte past the cap is read.
+                val read = channel.readAvailable(bytes, total, minOf(CHUNK_SIZE, maxBytes - total))
+                if (read < 0) break
+                total += read
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // A cut-off compressed body fails while decoding; keep what was decoded before that.
+            if (total == 0) throw e
         }
         FetchResult.Success(
             bytes = if (total == maxBytes) bytes else bytes.copyOf(total),

@@ -57,8 +57,13 @@ class FetchStartTest {
     fun readsAtMost64KbOfAnEndlessPageThenStops() =
         runTest {
             val body = EndlessBody()
+            val ranges = mutableListOf<String?>()
             val engine =
-                MockEngine { respond(body, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/html")) }
+                MockEngine { request ->
+                    ranges += request.headers[HttpHeaders.Range]
+                    // A server that ignores the range answers 200 with the whole (endless) page.
+                    respond(body, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/html"))
+                }
 
             val result =
                 newzHttpClient(
@@ -71,6 +76,54 @@ class FetchStartTest {
             // own response pipeline may have copied a little further ahead before the close.
             assertTrue(body.cancelled, "the response body was not closed after the first 64 KB")
             assertTrue(body.handedOut < MAX_READ_AHEAD, "the client pulled ${body.handedOut} bytes")
+            assertEquals(listOf<String?>(RANGE), ranges, "asked once, for the first 64 KB")
+        }
+
+    @Test
+    fun partialContentAnswerIsReadAsTheStartOfThePage() =
+        runTest {
+            val html = "<html><head><meta property=\"og:image\" content=\"/a.jpg\"><title>T</title>"
+            val ranges = mutableListOf<String?>()
+            val engine =
+                MockEngine { request ->
+                    ranges += request.headers[HttpHeaders.Range]
+                    respond(
+                        html,
+                        HttpStatusCode.PartialContent,
+                        headersOf(
+                            HttpHeaders.ContentType to listOf("text/html; charset=utf-8"),
+                            HttpHeaders.ContentRange to listOf("bytes 0-${html.length - 1}/250000"),
+                        ),
+                    )
+                }
+            val result =
+                newzHttpClient(
+                    engine,
+                ).fetchStart("https://news.example.org/a", PageImageFinder.PAGE_START_BYTES)
+            assertIs<FetchResult.Success>(result)
+            assertEquals(206, result.status)
+            assertEquals(html, result.bytes.decodeToString())
+            assertEquals(listOf<String?>(RANGE), ranges)
+        }
+
+    @Test
+    fun rangeNotSatisfiableIsAskedOnceMoreWithoutTheRange() =
+        runTest {
+            val html = "<html><head><meta property=\"og:image\" content=\"/a.jpg\"></head></html>"
+            val ranges = mutableListOf<String?>()
+            val engine =
+                MockEngine { request ->
+                    val range = request.headers[HttpHeaders.Range]
+                    ranges += range
+                    if (range != null) respond("", HttpStatusCode.RequestedRangeNotSatisfiable) else respond(html)
+                }
+            val result =
+                newzHttpClient(
+                    engine,
+                ).fetchStart("https://news.example.org/a", PageImageFinder.PAGE_START_BYTES)
+            assertIs<FetchResult.Success>(result)
+            assertEquals(html, result.bytes.decodeToString())
+            assertEquals(listOf(RANGE, null), ranges)
         }
 
     /**
@@ -108,6 +161,7 @@ class FetchStartTest {
                 assertIs<FetchResult.Success>(result)
                 assertEquals(PageImageFinder.PAGE_START_BYTES, result.bytes.size)
                 withTimeout(10_000) { finished.await() }
+                println("fetchStart: server ignoring Range sent ${sent.get()} bytes of $BIG_PAGE")
                 assertTrue(sent.get() < BIG_PAGE / 4, "the server sent ${sent.get()} of $BIG_PAGE bytes")
             } finally {
                 server.stop(0)
@@ -130,11 +184,177 @@ class FetchStartTest {
     @Test
     fun errorStatusIsReported() =
         runTest {
-            val engine = MockEngine { respond("", HttpStatusCode.Forbidden) }
+            var requests = 0
+            val engine =
+                MockEngine {
+                    requests++
+                    respond("", HttpStatusCode.Forbidden)
+                }
             assertEquals(
                 FetchResult.HttpError(403),
                 newzHttpClient(engine).fetchStart("https://news.example.org/a", PageImageFinder.PAGE_START_BYTES),
             )
+            // A 403 may be the range's fault, so it is asked once more without it; then it stands.
+            assertEquals(2, requests)
+        }
+
+    @Test
+    fun missingPageIsNotAskedTwice() =
+        runTest {
+            var requests = 0
+            val engine =
+                MockEngine {
+                    requests++
+                    respond("", HttpStatusCode.NotFound)
+                }
+            assertEquals(
+                FetchResult.HttpError(404),
+                newzHttpClient(engine).fetchStart("https://news.example.org/a", PageImageFinder.PAGE_START_BYTES),
+            )
+            assertEquals(1, requests)
+        }
+
+    /**
+     * Over a real socket, through a redirect: the server honours the range on the page the
+     * redirect leads to, so only the first 64 KB of a 32 MB page ever leaves it.
+     */
+    @Test
+    fun serverThatHonoursTheRangeSendsOnly64Kb() =
+        runBlocking {
+            val sent = AtomicLong()
+            val pageRanges = mutableListOf<String?>()
+            val server = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
+            server.createContext("/start") { exchange ->
+                exchange.responseHeaders.add("Location", "/page")
+                exchange.sendResponseHeaders(302, -1)
+                exchange.close()
+            }
+            server.createContext("/page") { exchange ->
+                val range = exchange.requestHeaders.getFirst("Range")
+                synchronized(pageRanges) { pageRanges += range }
+                val end =
+                    Regex("bytes=0-(\\d+)")
+                        .matchEntire(range.orEmpty())
+                        ?.groupValues
+                        ?.get(1)
+                        ?.toLong()
+                val length = if (end != null) minOf(end + 1, BIG_PAGE) else BIG_PAGE
+                exchange.responseHeaders.add("Content-Type", "text/html")
+                if (end != null) exchange.responseHeaders.add("Content-Range", "bytes 0-${length - 1}/$BIG_PAGE")
+                exchange.sendResponseHeaders(if (end != null) 206 else 200, length)
+                val chunk = ByteArray(READ_CHUNK) { 'x'.code.toByte() }
+                try {
+                    exchange.responseBody.use { out ->
+                        while (sent.get() < length) {
+                            val n = minOf(chunk.size.toLong(), length - sent.get()).toInt()
+                            out.write(chunk, 0, n)
+                            sent.addAndGet(n.toLong())
+                        }
+                    }
+                } catch (_: IOException) {
+                    // The client hung up.
+                }
+            }
+            server.start()
+            try {
+                val url = "http://127.0.0.1:${server.address.port}/start"
+                val result = newzHttpClient().fetchStart(url, PageImageFinder.PAGE_START_BYTES)
+                assertIs<FetchResult.Success>(result)
+                assertEquals(206, result.status)
+                assertEquals(PageImageFinder.PAGE_START_BYTES, result.bytes.size)
+                assertEquals(listOf<String?>(RANGE), pageRanges, "the redirect hop kept the range")
+                println("fetchStart: server honouring Range sent ${sent.get()} bytes of $BIG_PAGE")
+                assertEquals(PageImageFinder.PAGE_START_BYTES.toLong(), sent.get())
+            } finally {
+                server.stop(0)
+            }
+        }
+
+    /**
+     * A gzipped page whose ranged answer stops mid-stream: decoding ends with "unexpected end of
+     * stream", and the bytes decoded until then still give the page's og:image.
+     */
+    @Test
+    fun cutOffGzippedPartialContentStillGivesThePicture() =
+        runBlocking {
+            val random = java.util.Random(7)
+            val filler =
+                buildString {
+                    // Barely compressible text, so the cut lands before 64 KB of page is decoded.
+                    while (length < 400_000) append(java.lang.Long.toString(random.nextLong(), 36)).append(' ')
+                }
+            val html =
+                "<html><head><meta property=\"og:image\" content=\"https://img.example.org/lead.jpg\">" +
+                    "<title>T</title></head><body><p>$filler</p></body></html>"
+            val gzipped =
+                java.io
+                    .ByteArrayOutputStream()
+                    .also { out ->
+                        java.util.zip
+                            .GZIPOutputStream(out)
+                            .use { it.write(html.encodeToByteArray()) }
+                    }.toByteArray()
+            val cut = gzipped.copyOf(CUT_GZIP_BYTES)
+            val server = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
+            server.createContext("/page") { exchange ->
+                exchange.responseHeaders.add("Content-Type", "text/html; charset=utf-8")
+                exchange.responseHeaders.add("Content-Encoding", "gzip")
+                exchange.responseHeaders.add("Content-Range", "bytes 0-${cut.size - 1}/${gzipped.size}")
+                exchange.sendResponseHeaders(206, cut.size.toLong())
+                exchange.responseBody.use { it.write(cut) }
+            }
+            server.start()
+            try {
+                val url = "http://127.0.0.1:${server.address.port}/page"
+                val result = newzHttpClient().fetchStart(url, PageImageFinder.PAGE_START_BYTES)
+                assertIs<FetchResult.Success>(result)
+                assertEquals(206, result.status)
+                val text = result.bytes.decodeToString()
+                assertTrue(
+                    result.bytes.size in 1 until PageImageFinder.PAGE_START_BYTES,
+                    "decoded ${result.bytes.size}",
+                )
+                assertTrue(html.startsWith(text), "the decoded bytes are the start of the page")
+                assertEquals("https://img.example.org/lead.jpg", PageImageFinder(newzHttpClient()).find(url))
+            } finally {
+                server.stop(0)
+            }
+        }
+
+    /** gzip + range over a real socket when the cut lands after 64 KB of page: a full 64 KB comes back. */
+    @Test
+    fun gzippedPartialContentLongerThanTheCapGivesTheFirst64Kb() =
+        runBlocking {
+            val html = "<html><head><title>T</title></head><body>" + "<p>Paragraph text.</p>".repeat(50_000)
+            val gzipped =
+                java.io
+                    .ByteArrayOutputStream()
+                    .also { out ->
+                        java.util.zip
+                            .GZIPOutputStream(out)
+                            .use { it.write(html.encodeToByteArray()) }
+                    }.toByteArray()
+            val cut = gzipped.copyOf(minOf(gzipped.size, PageImageFinder.PAGE_START_BYTES))
+            val server = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
+            server.createContext("/page") { exchange ->
+                exchange.responseHeaders.add("Content-Type", "text/html")
+                exchange.responseHeaders.add("Content-Encoding", "gzip")
+                exchange.sendResponseHeaders(206, cut.size.toLong())
+                exchange.responseBody.use { it.write(cut) }
+            }
+            server.start()
+            try {
+                val result =
+                    newzHttpClient().fetchStart(
+                        "http://127.0.0.1:${server.address.port}/page",
+                        PageImageFinder.PAGE_START_BYTES,
+                    )
+                assertIs<FetchResult.Success>(result)
+                assertEquals(PageImageFinder.PAGE_START_BYTES, result.bytes.size)
+                assertTrue(html.startsWith(result.bytes.decodeToString()))
+            } finally {
+                server.stop(0)
+            }
         }
 
     private companion object {
@@ -146,5 +366,11 @@ class FetchStartTest {
         const val MAX_READ_AHEAD = 1024 * 1024
 
         const val BIG_PAGE = 32L * 1024 * 1024
+
+        /** The Range header fetchStart sends for the first 64 KB. */
+        const val RANGE = "bytes=0-65535"
+
+        /** Where the cut gzip answer stops: well short of 64 KB of decoded page. */
+        const val CUT_GZIP_BYTES = 20_000
     }
 }
