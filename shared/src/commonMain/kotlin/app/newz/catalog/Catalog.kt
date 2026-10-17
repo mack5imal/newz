@@ -21,7 +21,7 @@ data class Outlet(
 
 /**
  * One bundled feed: an outlet's section. [checkedUrl] is the URL the catalog health check
- * landed on after redirects, when it differs from [url].
+ * landed on after redirects, when it differs from [url]. A local feed names its [metroId].
  */
 data class CatalogFeed(
     val id: String,
@@ -30,16 +30,37 @@ data class CatalogFeed(
     val url: String,
     val topics: List<String>,
     val checkedUrl: String? = null,
+    val metroId: String? = null,
 )
 
-/** The bundled catalog of topics, outlets and feeds, with lookups. */
+/**
+ * A US metropolitan statistical area the Local topic covers (SPEC S29). [cbsa] is its Census
+ * CBSA code, [population] the latest Census estimate, and [lat]/[lon] its Census internal point.
+ */
+data class Metro(
+    val id: String,
+    val cbsa: String,
+    val name: String,
+    val population: Int,
+    val lat: Double,
+    val lon: Double,
+)
+
+/** The bundled catalog of topics, metros, outlets and feeds, with lookups. */
 class Catalog(
     val topics: List<Topic>,
     val outlets: List<Outlet>,
     val feeds: List<CatalogFeed>,
+    val metros: List<Metro> = emptyList(),
 ) {
     private val outletsById = outlets.associateBy { it.id }
     private val feedsById = feeds.associateBy { it.id }
+    private val metrosById = metros.associateBy { it.id }
+    private val feedsByMetro: Map<String, List<CatalogFeed>> =
+        feeds
+            .filter { LOCAL_TOPIC in it.topics }
+            .mapNotNull { feed -> feed.metroId?.let { it to feed } }
+            .groupBy({ it.first }, { it.second })
     private val feedsByTopic: Map<String, List<CatalogFeed>> =
         buildMap<String, MutableList<CatalogFeed>> {
             for (feed in feeds) {
@@ -55,6 +76,16 @@ class Catalog(
     fun feed(id: String): CatalogFeed? = feedsById[id]
 
     fun topic(id: String): Topic? = topics.firstOrNull { it.id == id }
+
+    fun metro(id: String): Metro? = metrosById[id]
+
+    /** The Local-topic feeds for [metroId], in catalog order; empty for an unknown metro. */
+    fun localFeeds(metroId: String): List<CatalogFeed> = feedsByMetro[metroId].orEmpty()
+
+    companion object {
+        /** The topic id local feeds carry. */
+        const val LOCAL_TOPIC = "local"
+    }
 }
 
 /** Loads the catalog compiled into the app from `catalog/catalog.json` at build time. */
@@ -64,6 +95,7 @@ object CatalogLoader {
             topics = CatalogData.topics(),
             outlets = CatalogData.outlets(),
             feeds = CatalogData.feeds(),
+            metros = CatalogData.metros(),
         )
     }
 

@@ -177,6 +177,86 @@ class CatalogTest {
     }
 
     @Test
+    fun hasExactlyFiftyMetrosIncludingSeattle() {
+        assertEquals(50, catalog.metros.size)
+        assertEquals(
+            50,
+            catalog.metros
+                .map { it.id }
+                .toSet()
+                .size,
+            "duplicate metro id",
+        )
+        assertEquals(
+            50,
+            catalog.metros
+                .map { it.cbsa }
+                .toSet()
+                .size,
+            "duplicate metro cbsa",
+        )
+        val seattle = catalog.metros.single { it.cbsa == "42660" }
+        assertEquals("Seattle", seattle.name)
+        for (metro in catalog.metros) {
+            assertTrue(metro.cbsa.length == 5 && metro.cbsa.all { it in '0'..'9' }, "${metro.id}: cbsa ${metro.cbsa}")
+            assertTrue(metro.name.isNotBlank(), "${metro.id}: name")
+            assertTrue(metro.population > 1_000_000, "${metro.id}: population ${metro.population}")
+            // Inside the contiguous US, Alaska and Hawaii's bounding box.
+            assertTrue(metro.lat in 18.0..72.0 && metro.lon in -180.0..-65.0, "${metro.id}: ${metro.lat},${metro.lon}")
+            assertEquals(metro, catalog.metro(metro.id))
+        }
+        // Ordered by population, largest first.
+        assertEquals(catalog.metros.sortedByDescending { it.population }, catalog.metros)
+    }
+
+    @Test
+    fun everyMetroHasAtLeastTwoLocalFeeds() {
+        for (metro in catalog.metros) {
+            val feeds = catalog.localFeeds(metro.id)
+            assertTrue(feeds.size >= 2, "${metro.name} has ${feeds.size} local feeds")
+            for (feed in feeds) {
+                assertTrue(local.id in feed.topics, "${feed.id}: not tagged local")
+                assertEquals(metro.id, feed.metroId, "${feed.id}: metroId")
+            }
+        }
+        assertTrue(catalog.localFeeds("no-such-metro").isEmpty())
+    }
+
+    @Test
+    fun everyLocalFeedNamesAKnownMetro() {
+        val metroIds = catalog.metros.map { it.id }.toSet()
+        for (feed in catalog.feeds) {
+            val metroId = feed.metroId
+            if (local.id in feed.topics) {
+                assertNotNull(metroId, "${feed.id}: local feed without a metroId")
+                assertTrue(metroId in metroIds, "${feed.id}: unknown metro $metroId")
+                assertEquals(listOf(local.id), feed.topics, "${feed.id}: local feeds carry only the local topic")
+            } else {
+                assertEquals(null, metroId, "${feed.id}: metroId on a non-local feed")
+            }
+        }
+        assertEquals(
+            catalog.feedsForTopic(local.id),
+            catalog.metros.flatMap { catalog.localFeeds(it.id) }.sortedBy {
+                catalog.feeds.indexOf(it)
+            },
+        )
+    }
+
+    @Test
+    fun localFeedsPassHostGuardAndHavePaywalls() {
+        val localFeeds = catalog.feedsForTopic(local.id)
+        assertTrue(localFeeds.isNotEmpty())
+        for (feed in localFeeds) {
+            assertFalse(HostGuard.isBlocked(feed.url), "${feed.id}: ${feed.url}")
+            feed.checkedUrl?.let { assertFalse(HostGuard.isBlocked(it), "${feed.id}: checked $it") }
+            val outlet = assertNotNull(catalog.outlet(feed.outletId), "${feed.id}: unknown outlet")
+            assertTrue(outlet.paywall in PaywallStatus.entries, "${outlet.id}: paywall")
+        }
+        assertEquals(PaywallStatus.METERED, outletByDomain("seattletimes.com")?.paywall, "Seattle Times")
+    }
+
+    @Test
     fun lookupsFindFeedsAndOutlets() {
         val first = catalog.feeds.first()
         assertEquals(first, catalog.feed(first.id))
