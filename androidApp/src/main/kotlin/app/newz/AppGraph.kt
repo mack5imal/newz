@@ -23,6 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import java.io.File
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -47,6 +48,8 @@ class AppGraph private constructor(
         val customTabsProvider: () -> String?,
         /** The database file; null opens a fresh in-memory database. */
         val databaseName: String?,
+        /** The preferences file in the app's files directory (one DataStore per file per process). */
+        val prefsFileName: String,
         val httpClient: () -> HttpClient,
     ) {
         companion object {
@@ -58,6 +61,7 @@ class AppGraph private constructor(
                     isOnline = androidConnectivity(app),
                     customTabsProvider = { CustomTabsClient.getPackageName(app, emptyList()) },
                     databaseName = NewzStorage.DATABASE_NAME,
+                    prefsFileName = PreferencesStore.FILE_NAME,
                     httpClient = { newzHttpClient() },
                 )
             }
@@ -74,6 +78,9 @@ class AppGraph private constructor(
         var customTabsProvider: () -> String? = base.customTabsProvider
         var databaseName: String? = base.databaseName
 
+        /** Tests point this at their own file so they never touch the user's real preferences. */
+        var prefsFileName: String = base.prefsFileName
+
         /** Builds the guarded HTTP client (a test wraps it to count the hosts the app contacts). */
         var httpClient: () -> HttpClient = base.httpClient
 
@@ -87,6 +94,7 @@ class AppGraph private constructor(
                 isOnline = isOnline,
                 customTabsProvider = customTabsProvider,
                 databaseName = databaseName,
+                prefsFileName = prefsFileName,
                 httpClient = httpClient,
             )
     }
@@ -98,7 +106,7 @@ class AppGraph private constructor(
     val catalog: Catalog get() = config.catalog
     val clock: () -> Instant get() = config.clock
     val articleStore: ArticleStore = ArticleStore(sqlDriver)
-    val preferencesStore: PreferencesStore get() = preferences()
+    val preferencesStore: PreferencesStore get() = preferences(config.prefsFileName)
     val imageLoader: ImageLoader get() = NewzImageLoader.get(appContext)
     val articleOpener: ArticleOpener = ArticleOpener(config.customTabsProvider)
     val shareLauncher: ShareLauncher = ShareLauncher()
@@ -146,7 +154,7 @@ class AppGraph private constructor(
         @Volatile
         private var current: AppGraph? = null
         private var application: Context? = null
-        private var preferences: PreferencesStore? = null
+        private val preferences = mutableMapOf<String, PreferencesStore>()
 
         /** Called once by [NewzApplication]; the graph itself is built on first use. */
         fun install(context: Context) {
@@ -162,9 +170,9 @@ class AppGraph private constructor(
 
         /**
          * Test hook: replaces the graph with one built from the current config plus [block]'s
-         * changes (catalog, clock, connectivity, Custom Tabs provider, database). The old graph's
-         * coroutines stop. Preferences stay one DataStore per process; tests write them through
-         * [preferencesStore]. Call before launching an activity.
+         * changes (catalog, clock, connectivity, Custom Tabs provider, database, preferences file).
+         * The old graph's coroutines stop. Each preferences file keeps one DataStore per process;
+         * tests write them through [preferencesStore]. Call before launching an activity.
          */
         fun override(block: Overrides.() -> Unit): AppGraph =
             synchronized(this) {
@@ -190,10 +198,12 @@ class AppGraph private constructor(
             name: String?,
         ): SqlDriver = AndroidSqliteDriver(NewzDatabase.Schema, context, name)
 
-        /** DataStore allows one instance per file per process, so preferences outlive any graph. */
-        private fun preferences(): PreferencesStore =
-            preferences ?: synchronized(this) {
-                preferences ?: PreferencesStore.create().also { preferences = it }
+        /** DataStore allows one instance per file per process, so each file's store outlives any graph. */
+        private fun preferences(fileName: String): PreferencesStore =
+            synchronized(this) {
+                preferences.getOrPut(fileName) {
+                    PreferencesStore.create(File(app().filesDir, fileName).path)
+                }
             }
 
         private fun app(): Context = checkNotNull(application) { "AppGraph.install(context) was not called" }

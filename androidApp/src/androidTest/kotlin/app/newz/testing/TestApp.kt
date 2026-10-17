@@ -29,10 +29,14 @@ import kotlin.time.Instant
 
 /**
  * Launch helpers for UI tests. [install] swaps the [AppGraph] (catalog, connectivity, Custom Tabs
- * provider, clock, HTTP client, a fresh in-memory database unless [keepDatabase]) and must run before
- * [launch]. Write preferences with [TestPrefs] after [install].
+ * provider, clock, HTTP client, a fresh in-memory database and fresh test preferences unless
+ * [keepDatabase]) and must run before [launch]. Write preferences with [TestPrefs] after [install].
+ * Tests keep their preferences in [PREFS_FILE], never the app's real `newz.preferences_pb`.
  */
 object TestApp {
+    /** The tests' own preferences file, next to the app's real one. */
+    const val PREFS_FILE = "newz-test.preferences_pb"
+
     fun install(
         catalog: Catalog,
         isOnline: () -> Boolean = { true },
@@ -40,16 +44,22 @@ object TestApp {
         clock: () -> Instant = { Clock.System.now() },
         keepDatabase: Boolean = false,
         httpClient: () -> HttpClient = { newzHttpClient() },
-    ): AppGraph =
-        AppGraph.override {
-            this.catalog = catalog
-            this.isOnline = isOnline
-            this.customTabsProvider = customTabsProvider
-            this.clock = clock
-            databaseName = null
-            this.keepDatabase = keepDatabase
-            this.httpClient = httpClient
-        }
+    ): AppGraph {
+        val graph =
+            AppGraph.override {
+                this.catalog = catalog
+                this.isOnline = isOnline
+                this.customTabsProvider = customTabsProvider
+                this.clock = clock
+                databaseName = null
+                prefsFileName = PREFS_FILE
+                this.keepDatabase = keepDatabase
+                this.httpClient = httpClient
+            }
+        // A relaunch on the same database keeps its preferences too; anything else starts fresh.
+        if (!keepDatabase) runBlocking { graph.preferencesStore.replace(UserPrefs()) }
+        return graph
+    }
 
     fun launch(): ActivityScenario<MainActivity> = ActivityScenario.launch(MainActivity::class.java)
 
