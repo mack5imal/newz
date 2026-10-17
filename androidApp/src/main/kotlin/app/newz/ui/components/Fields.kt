@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +39,7 @@ private fun FieldBox(
     placeholder: String?,
     clearLabel: String,
     modifier: Modifier = Modifier,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
 ) {
     val c = palette()
     BasicTextField(
@@ -50,6 +52,7 @@ private fun FieldBox(
                 .then(if (description != null) Modifier.semantics { contentDescription = description } else Modifier),
         textStyle = NewzTokens.typeField.scaled().copy(color = c.ink),
         singleLine = true,
+        keyboardOptions = keyboardOptions,
         cursorBrush = SolidColor(c.ink),
         decorationBox = { inner ->
             Row(
@@ -88,7 +91,8 @@ private fun FieldBox(
  * clear [IconButton] ("Clear") once there is text; 6 below, the [helper] at the left and a
  * "{n}/[maxLength]" counter at the right in `type-row-sub`. With an [error], the border, the
  * message (with `icon-warning`) and the counter turn `alert`. [fieldModifier] goes on the editable
- * field itself (for a `FocusRequester`); [counter] replaces the default counter text.
+ * field itself (for a `FocusRequester`); [counter] replaces the default counter text;
+ * [keyboardOptions] picks the keyboard (numeric for the zip code).
  */
 @Composable
 fun TextField(
@@ -103,6 +107,7 @@ fun TextField(
     clearLabel: String = "Clear",
     fieldModifier: Modifier = Modifier,
     counter: String = "${value.length}/$maxLength",
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
 ) {
     val c = palette()
     val isError = error != null
@@ -122,6 +127,7 @@ fun TextField(
             placeholder = placeholder,
             clearLabel = clearLabel,
             modifier = fieldModifier,
+            keyboardOptions = keyboardOptions,
         )
         Spacer(Modifier.height(NewzTokens.gapIconLabel))
         Row(horizontalArrangement = Arrangement.spacedBy(NewzTokens.spaceM), verticalAlignment = Alignment.Top) {

@@ -10,6 +10,7 @@ import okio.Buffer
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.net.InetAddress
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Clock
@@ -37,7 +38,8 @@ import kotlin.time.Instant
  * server.close()                                // later requests fail: the app reads it as offline
  * ```
  * Configuration may change between requests; reads and writes are thread-safe enough for tests
- * (each [FeedConfig] field is volatile). [requests] counts every request served.
+ * (each [FeedConfig] field is volatile). [requests] counts every request served; [requestLog]
+ * keeps each one's line, URL, headers and body.
  */
 class MockFeedServer(
     val feedCount: Int = 30,
@@ -67,6 +69,14 @@ class MockFeedServer(
 
     /** Every request served so far. */
     val requests = AtomicInteger()
+
+    private val log = ConcurrentLinkedQueue<String>()
+
+    /**
+     * Every request served so far as text: its request line, full URL, headers and body. Privacy
+     * tests search it for data that must never leave the phone (the Local zip code).
+     */
+    val requestLog: List<String> get() = log.toList()
 
     val feeds: List<FeedConfig> get() = configs
 
@@ -141,6 +151,8 @@ class MockFeedServer(
     private inner class FeedDispatcher : Dispatcher() {
         override fun dispatch(request: RecordedRequest): MockResponse {
             requests.incrementAndGet()
+            val body = request.body?.utf8().orEmpty()
+            log.add("${request.requestLine}\n${request.url}\n${request.headers}\n$body")
             val path = request.url.encodedPath
             FEED_PATH.matchEntire(path)?.let { m ->
                 val index = m.groupValues[1].toInt()

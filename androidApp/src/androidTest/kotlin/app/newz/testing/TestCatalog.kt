@@ -3,6 +3,7 @@ package app.newz.testing
 import app.newz.AppGraph
 import app.newz.catalog.Catalog
 import app.newz.catalog.CatalogFeed
+import app.newz.catalog.Metro
 import app.newz.catalog.Outlet
 import app.newz.catalog.PaywallStatus
 import app.newz.catalog.Topic
@@ -21,6 +22,11 @@ object TestCatalog {
     const val TECH = "tech"
     const val BUSINESS = "business"
     const val HEALTH = "health"
+    const val LOCAL = Catalog.LOCAL_TOPIC
+
+    /** Metro ids as the bundled zip table names them (98101 lies in Seattle). */
+    const val SEATTLE = "seattle"
+    const val CHICAGO = "chicago"
 
     val FEED_TOPICS = listOf(WORLD, SCIENCE, TECH, BUSINESS)
 
@@ -31,6 +37,13 @@ object TestCatalog {
             Topic(TECH, "Tech", "Technology news"),
             Topic(BUSINESS, "Business", "Business news"),
             Topic(HEALTH, "Health", "Health news"),
+            Topic(LOCAL, "Local", "News near you"),
+        )
+
+    val metros: List<Metro> =
+        listOf(
+            Metro(CHICAGO, "16980", "Chicago", 9_434_123, 41.75878, -87.841887),
+            Metro(SEATTLE, "42660", "Seattle", 4_161_883, 47.475046, -121.813743),
         )
 
     fun outletId(feed: Int): String = "out-$feed"
@@ -43,11 +56,13 @@ object TestCatalog {
 
     /**
      * One outlet and one feed per server feed, the first [feeds] of them. [paywall] sets each
-     * outlet's catalog paywall status (default none).
+     * outlet's catalog paywall status (default none). A feed [localMetro] names is a Local feed
+     * of that metro (topic [LOCAL]) instead of a [topicOf] feed. The catalog carries [metros].
      */
     fun build(
         server: MockFeedServer,
         feeds: Int = server.feedCount,
+        localMetro: (feed: Int) -> String? = { null },
         paywall: (feed: Int) -> PaywallStatus = { PaywallStatus.NONE },
     ): Catalog =
         Catalog(
@@ -55,8 +70,11 @@ object TestCatalog {
             outlets = List(feeds) { Outlet(outletId(it), outletName(it), "outlet$it.test", paywall(it), 0.5) },
             feeds =
                 List(feeds) {
-                    CatalogFeed(feedId(it), outletId(it), "Main", server.feedUrl(it), listOf(topicOf(it)))
+                    val metro = localMetro(it)
+                    val topic = if (metro != null) LOCAL else topicOf(it)
+                    CatalogFeed(feedId(it), outletId(it), "Main", server.feedUrl(it), listOf(topic), metroId = metro)
                 },
+            metros = metros,
         )
 }
 

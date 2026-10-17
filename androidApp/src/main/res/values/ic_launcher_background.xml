@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launcher icon colours (design/HANDOFF.md §app-icon): the light-blue background, N and split, and the navy tile. -->
+    <color name="ic_launcher_background">#DCE5F2</color>
+    <color name="ic_launcher_tile">#1D3A5F</color>
+</resources>

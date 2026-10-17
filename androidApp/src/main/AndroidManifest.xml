@@ -18,6 +18,7 @@
     <application
         android:name=".NewzApplication"
         android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
         android:label="Newz"
         android:supportsRtl="true"
         android:theme="@style/Theme.Newz">

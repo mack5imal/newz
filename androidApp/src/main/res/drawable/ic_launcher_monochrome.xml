@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed (monochrome) launcher icon layer: the tile with the N and the split line knocked out
+     (even-odd). The split line is cut into the parts outside the N so no knockout overlaps
+     another; the system tints the single colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M38,29H70A5,5 0,0 1,75 34V74A5,5 0,0 1,70 79H38A5,5 0,0 1,33 74V34A5,5 0,0 1,38 29Z
+            M42,71V37h7l10,21V37h7v34h-7L49,50v21z
+            M33,53H42V55H33Z
+            M49,53H50.429L51.381,55H49Z
+            M56.619,53H59V55H57.571Z
+            M66,53H75V55H66Z" />
+</vector>

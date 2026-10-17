@@ -2,22 +2,17 @@ package app.newz.ui.nav
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import app.newz.ui.components.AppBarSub
 import app.newz.ui.theme.LocalNewzPalette
-import app.newz.ui.theme.NewzTokens
-import app.newz.ui.theme.SignageText
 
 /** Every full-screen destination. [title] is the app-bar title its placeholder shows. */
 sealed interface Screen {
@@ -151,12 +146,6 @@ fun PlaceholderScreen(
             .background(c.paper)
             .testTag(Screen.tagOf(screen)),
     ) {
-        if (screen == Screen.Onboarding) {
-            Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.Center) {
-                SignageText(screen.title, NewzTokens.typeWordmark, color = c.ink)
-            }
-        } else {
-            AppBarSub(title = screen.title, onBack = onBack)
-        }
+        AppBarSub(title = screen.title, onBack = onBack)
     }
 }

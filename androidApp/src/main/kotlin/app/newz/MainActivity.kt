@@ -23,6 +23,8 @@ import app.newz.ui.nav.NavHost
 import app.newz.ui.nav.PlaceholderScreen
 import app.newz.ui.nav.Screen
 import app.newz.ui.nav.rememberBackStack
+import app.newz.ui.onboarding.OnboardingScreen
+import app.newz.ui.onboarding.OnboardingViewModel
 import app.newz.ui.theme.LocalNewzPalette
 import app.newz.ui.theme.NewzTheme
 
@@ -54,6 +56,14 @@ private fun NewzNavigation(
     val backStack = rememberBackStack(if (prefs.onboarded) Screen.Feed else Screen.Onboarding)
     NavHost(backStack) { screen ->
         when (screen) {
+            Screen.Onboarding -> {
+                val onboardingViewModel = viewModel { OnboardingViewModel(graph) }
+                OnboardingScreen(
+                    viewModel = onboardingViewModel,
+                    onFinished = { backStack.replaceAll(Screen.Feed) },
+                )
+            }
+
             Screen.Feed -> {
                 val feedViewModel = viewModel { FeedViewModel(graph) }
                 FeedScreen(

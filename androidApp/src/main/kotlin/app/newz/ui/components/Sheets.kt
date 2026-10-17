@@ -192,7 +192,8 @@ fun SheetActionRow(
 /**
  * `BottomActionBar` — the bar pinned to the bottom of onboarding: a `card` surface with a 2 dp
  * `line` top border, padding 12 12 24 16, gap 12; the [status] in `type-row-title` (and an
- * optional `type-row-sub` [subStatus]) at the left and a Primary [Button] at the right.
+ * optional `type-row-sub` [subStatus]) at the left and a Primary [Button] at the right, with an
+ * optional [buttonTrailingIcon] after its label.
  */
 @Composable
 fun BottomActionBar(
@@ -202,6 +203,7 @@ fun BottomActionBar(
     modifier: Modifier = Modifier,
     subStatus: String? = null,
     buttonEnabled: Boolean = true,
+    buttonTrailingIcon: ImageVector? = null,
 ) {
     val c = palette()
     Column(modifier.fillMaxWidth().background(c.card)) {
@@ -224,7 +226,12 @@ fun BottomActionBar(
                 PlainText(text = status, style = NewzTokens.typeRowTitle, color = c.ink)
                 if (subStatus != null) PlainText(text = subStatus, style = NewzTokens.typeRowSub, color = c.inkMuted)
             }
-            Button(text = buttonLabel, onClick = onButton, enabled = buttonEnabled)
+            Button(
+                text = buttonLabel,
+                onClick = onButton,
+                enabled = buttonEnabled,
+                trailingIcon = buttonTrailingIcon,
+            )
         }
     }
 }

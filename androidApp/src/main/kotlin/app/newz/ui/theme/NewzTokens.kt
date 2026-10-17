@@ -387,6 +387,11 @@ object NewzTokens {
     val bottomBarPaddingBottom = 24.dp
     val appIconSize = 56.dp
 
+    // onboarding: the header's 18 dp gaps and 22 dp bottom padding, and its 46/46 wordmark.
+    val typeWordmarkOnboarding = signage(FontWeight.ExtraBold, 46.sp, 46.sp, 0.04.em, scales = false)
+    val onboardingGap = 18.dp
+    val onboardingHeaderBottom = 22.dp
+
     // story-group `--many`: the sheet's top edge sits 92 dp down; its grabber area takes 18 dp more.
     val storySheetTopGap = 110.dp
 }

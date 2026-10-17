@@ -31,7 +31,8 @@ enum class ButtonVariant { Primary, Outline, Text, Disabled }
  * `Button` — every text button: 48 tall, padding 0 20 (0 12 for Text), an optional leading
  * 20 dp [icon] with gap 8, `type-button`, `radius-control` and a 2 dp border. [wide] makes it
  * full width. A Disabled button (or [enabled] false) can't be tapped. [contentColor] overrides
- * the Outline/Text border and text colour (the `sky` outline on a `BoardPanel`).
+ * the Outline/Text border and text colour (the `sky` outline on a `BoardPanel`); [trailingIcon]
+ * follows the label (onboarding's Continue arrow).
  */
 @Composable
 fun Button(
@@ -43,6 +44,7 @@ fun Button(
     icon: ImageVector? = null,
     enabled: Boolean = true,
     contentColor: Color? = null,
+    trailingIcon: ImageVector? = null,
 ) {
     val c = palette()
     val isEnabled = enabled && variant != ButtonVariant.Disabled
@@ -90,6 +92,7 @@ fun Button(
     ) {
         if (icon != null) NewzIcon(icon, content, size = NewzTokens.iconSizeInControl)
         SignageText(text = text, style = NewzTokens.typeButton, color = content, textAlign = TextAlign.Center)
+        if (trailingIcon != null) NewzIcon(trailingIcon, content, size = NewzTokens.iconSizeInControl)
     }
 }
 

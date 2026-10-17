@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher icon foreground, from the package SVG on its 108 dp canvas: the navy tile (rx 5),
+     the light-blue N and the light-blue split line, all inside the 66 dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="@color/ic_launcher_tile"
+        android:pathData="M38,29H70A5,5 0,0 1,75 34V74A5,5 0,0 1,70 79H38A5,5 0,0 1,33 74V34A5,5 0,0 1,38 29Z" />
+    <path
+        android:fillColor="@color/ic_launcher_background"
+        android:pathData="M42,71V37h7l10,21V37h7v34h-7L49,50v21z" />
+    <path
+        android:fillColor="@color/ic_launcher_background"
+        android:pathData="M33,53H75V55H33Z" />
+</vector>
