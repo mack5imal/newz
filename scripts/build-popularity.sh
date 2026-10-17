@@ -63,8 +63,11 @@ with open(source, newline="", encoding="utf-8") as f:
 
 def rank_of(domain):
     labels = domain.lower().strip(".").removeprefix("www.").split(".")
-    # Try the domain itself, then each parent down to two labels.
-    for i in range(0, max(1, len(labels) - 1)):
+    # Try the domain itself, then each parent down to the registrable domain: two labels,
+    # or three under a second-level public suffix (co.uk, com.au, ...), which is never looked up.
+    second_level = {"co", "com", "net", "org", "gov", "ac", "edu", "ne", "or"}
+    floor = 3 if len(labels) >= 3 and len(labels[-1]) == 2 and labels[-2] in second_level else 2
+    for i in range(0, max(1, len(labels) - floor + 1)):
         candidate = ".".join(labels[i:])
         if candidate in ranks:
             return ranks[candidate]
