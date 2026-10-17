@@ -304,6 +304,8 @@ class CardActionsTest {
         store.save(store.article(target.id)!!)
         assertEquals(1, store.listSaved().size)
 
+        val savedAt = store.listSaved().single().savedAt
+
         compose.waitUntil(TIMEOUT) { compose.onAllNodesWithText("Saved for later").fetchSemanticsNodes().isEmpty() }
         compose.openCardMenu(title)
         compose.onNodeWithText("Unsave").assertIsDisplayed()
@@ -312,6 +314,8 @@ class CardActionsTest {
         compose.onNodeWithText("Removed from saved").assertIsDisplayed()
         compose.onNodeWithText("Undo").performClick()
         compose.waitUntil(TIMEOUT) { store.listSaved().size == 1 }
+        // Undo restores the saved row exactly, keeping its original save time.
+        assertEquals(savedAt, store.listSaved().single().savedAt)
     }
 
     private companion object {

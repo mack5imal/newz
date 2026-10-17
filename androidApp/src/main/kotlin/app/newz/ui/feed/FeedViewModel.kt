@@ -171,14 +171,18 @@ class FeedViewModel(
         val id = card.group.lead.id
         val store = graph.articleStore
         viewModelScope.launch {
-            val stored = withContext(Dispatchers.IO) { store.article(id) } ?: return@launch
             if (card.saved) {
-                withContext(Dispatchers.IO) { store.unsave(id) }
+                // Undo puts back the saved row as it was: its snapshot and its original save time.
+                val saved =
+                    withContext(Dispatchers.IO) {
+                        store.listSaved().find { it.article.id == id }?.also { store.unsave(id) }
+                    }
                 graph.feedRepository.invalidate()
                 showUndo("Removed from saved") {
-                    withContext(Dispatchers.IO) { store.save(stored, graph.clock()) }
+                    if (saved != null) withContext(Dispatchers.IO) { store.save(saved.article, saved.savedAt) }
                 }
             } else {
+                val stored = withContext(Dispatchers.IO) { store.article(id) } ?: return@launch
                 val wasSaved =
                     withContext(Dispatchers.IO) { store.isSaved(id).also { store.save(stored, graph.clock()) } }
                 graph.feedRepository.invalidate()
