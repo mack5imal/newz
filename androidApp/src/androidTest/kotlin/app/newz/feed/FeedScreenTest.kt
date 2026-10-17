@@ -35,6 +35,7 @@ import app.newz.testing.MockFeedServer
 import app.newz.testing.TestApp
 import app.newz.testing.TestCatalog
 import app.newz.testing.TestPrefs
+import app.newz.testing.currentPrefs
 import app.newz.testing.servedCards
 import app.newz.testing.visibleCards
 import app.newz.testing.waitForCards
@@ -169,6 +170,7 @@ class FeedScreenTest {
         compose.waitForStableFeed(minCards = 20)
         val firstTen = compose.servedCards().take(10).map { it.id }
         assertEquals(10, firstTen.size)
+        val prefsBefore = currentPrefs()
 
         compose.onNode(hasText("Science") and hasClickAction()).performClick()
         compose.waitUntil(5_000) {
@@ -183,6 +185,7 @@ class FeedScreenTest {
         compose.onNodeWithText("Clear filter").performClick()
         compose.waitUntil(5_000) { compose.servedCards().take(10).map { it.id } == firstTen }
         assertEquals(firstTen, compose.servedCards().take(10).map { it.id })
+        assertEquals("filtering left the preferences unchanged", prefsBefore, currentPrefs())
 
         compose.onNode(hasText("Health") and hasClickAction()).performClick()
         compose.waitForText("No Health articles right now")

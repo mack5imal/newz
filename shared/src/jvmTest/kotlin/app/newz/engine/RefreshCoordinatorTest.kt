@@ -132,6 +132,30 @@ class RefreshCoordinatorTest {
         }
 
     @Test
+    fun topicFilterSetDuringALoadAppliesToItsContent() =
+        runTest {
+            val h = EngineHarness(feedTopics = mapOf("b" to listOf("world", "tech")))
+            h.items["a"] = listOf(TestItem("a-1", EngineHarness.uniqueTitle(1)))
+            h.items["b"] =
+                listOf(TestItem("b-1", EngineHarness.uniqueTitle(2)), TestItem("b-2", EngineHarness.uniqueTitle(3)))
+            h.items["c"] = listOf(TestItem("c-1", EngineHarness.uniqueTitle(4)))
+            val repo = h.repository(backgroundScope)
+            val gate = h.startHeldLoad(repo)
+
+            repo.setTopicFilter(setOf("tech")).join()
+            gate.complete(Unit)
+            repo.refresh().join()
+
+            assertEquals(listOf(1, 1, 1), listOf("a", "b", "c").map(h::requestsTo), "the load fetched every feed")
+            val cards = assertIs<FeedState.Content>(repo.feed.first()).cards
+            val leads = cards.map { it.group.lead.url }
+            assertEquals(setOf("https://news.example/b-1", "https://news.example/b-2"), leads.toSet(), "$leads")
+            assertTrue(cards.all { "tech" in it.group.lead.topics }, "every card carries the filtered topic")
+            assertFalse("https://news.example/a-1" in leads, "other-topic card fetched by the load is absent")
+            assertFalse("https://news.example/c-1" in leads, "other-topic card fetched by the load is absent")
+        }
+
+    @Test
     fun historyOnPicksTheMostReadOutletAsLead() =
         runTest {
             val h = EngineHarness()

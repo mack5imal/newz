@@ -37,10 +37,11 @@ data class TestItem(
  * A FeedRepository wired to an in-memory store and a counting MockEngine. Feeds `a`, `b`, `c`
  * (outlets of the same name, topic `world`) are served from [items]; a feed listed in
  * [failing] answers HTTP 500. While [gate] is set every request waits on it; a request to a feed
- * with an entry in [feedGates] also waits on that entry.
+ * with an entry in [feedGates] also waits on that entry. [feedTopics] overrides a feed's topics.
  */
 class EngineHarness(
     feedIds: List<String> = listOf("a", "b", "c"),
+    feedTopics: Map<String, List<String>> = emptyMap(),
 ) {
     val now: Instant = Instant.parse("2026-10-16T12:00:00Z")
 
@@ -48,7 +49,10 @@ class EngineHarness(
         Catalog(
             topics = listOf(Topic("world", "World", ""), Topic("tech", "Tech", "")),
             outlets = feedIds.map { Outlet(it, it.uppercase(), "$it.example", PaywallStatus.NONE, 1.0) },
-            feeds = feedIds.map { CatalogFeed("$it-world", it, "World", urlOf(it), listOf("world")) },
+            feeds =
+                feedIds.map {
+                    CatalogFeed("$it-world", it, "World", urlOf(it), feedTopics[it] ?: listOf("world"))
+                },
         )
 
     val prefs =

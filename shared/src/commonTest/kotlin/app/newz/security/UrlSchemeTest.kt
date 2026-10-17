@@ -1,11 +1,12 @@
-package app.newz.net
+package app.newz.security
 
+import app.newz.net.WebUrl
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Article open and share accept only http(s) links (phase 19 security pass). */
-class WebUrlTest {
+class UrlSchemeTest {
     @Test
     fun httpAndHttpsAreAccepted() {
         for (url in listOf(

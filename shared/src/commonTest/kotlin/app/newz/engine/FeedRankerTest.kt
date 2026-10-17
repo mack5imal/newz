@@ -104,7 +104,7 @@ class FeedRankerTest {
 
     internal fun worstWindowCount(ranked: List<StoryGroup>): Int =
         ranked
-            .windowed(FeedRanker.SPREAD_WINDOW, partialWindows = true)
+            .windowed(10, partialWindows = true)
             .maxOf { window ->
                 window
                     .groupingBy { it.lead.outletId }
@@ -126,7 +126,7 @@ class FeedRankerTest {
         val ranked = FeedRanker.rank(fixture, prefs, now)
         assertEquals(fixture.map { it.lead.id }.toSet(), ranked.map { it.lead.id }.toSet())
         assertEquals(200, ranked.size)
-        assertTrue(worstWindowCount(ranked) <= FeedRanker.MAX_PER_WINDOW, "worst ${worstWindowCount(ranked)}")
+        assertTrue(worstWindowCount(ranked) <= 2, "worst ${worstWindowCount(ranked)}")
         val top = medianAgeMinutes(ranked.subList(0, 20))
         val deep = medianAgeMinutes(ranked.subList(80, 100))
         assertTrue(top < deep, "median age 1-20 = $top min, 81-100 = $deep min")

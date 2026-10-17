@@ -2,9 +2,12 @@ package app.newz.engine
 
 import app.newz.feed.ParsedItem
 import app.newz.net.newzHttpClient
+import app.newz.store.CustomFeed
+import app.newz.store.UserPrefs
 import app.newz.store.muteKeyword
 import app.newz.store.muteTopic
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
@@ -160,6 +163,53 @@ class FeedRepositoryTest {
                 listOf(tech.url),
                 assertIs<FeedState.Content>(repo.feed.first()).cards.map { it.group.lead.url },
             )
+        }
+
+    @Test
+    fun topicFilterHidesWithoutChangingPrefsOrStoredUserData() =
+        runTest {
+            val h = EngineHarness()
+            h.online = false
+            h.cache("a", 4)
+            val tech =
+                ParsedItem("t1", "https://b.example/t1", EngineHarness.uniqueTitle(77), null, null, h.now - 1.hours)
+            h.store.upsert("b-world", "b", listOf("world", "tech"), listOf(tech), h.now)
+            val cached = h.store.articles().filter { it.outletId == "a" }
+            h.store.hide(cached[0], h.now)
+            h.store.save(cached[1], h.now)
+            h.store.recordOpen(cached[2].id, "a", listOf("world"), h.now - 1.hours)
+            h.store.addCustomFeed(
+                CustomFeed("custom-1", "https://custom.example/feed.xml", "Custom", null, "rss", h.now),
+            )
+            val prefEmissions = mutableListOf<UserPrefs>()
+            backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { h.prefs.collect { prefEmissions += it } }
+            val prefsBefore = h.prefs.value
+
+            fun storeTables() =
+                listOf(
+                    h.store.listHidden(),
+                    h.store.listSaved(),
+                    h.store.listHistory(),
+                    h.store.listCustomFeeds(),
+                    h.store.articles(),
+                    h.store.feedStatuses(),
+                )
+            val tablesBefore = storeTables()
+            assertTrue(tablesBefore.take(4).all { it.isNotEmpty() }, "every user table is seeded")
+
+            val repo = h.repository(backgroundScope)
+            val original = assertIs<FeedState.Content>(repo.feed.first()).cards
+            assertEquals(4, original.size)
+            repo.setTopicFilter(setOf("tech")).join()
+            val filtered = assertIs<FeedState.Content>(repo.feed.first()).cards
+            assertEquals(listOf(tech.url), filtered.map { it.group.lead.url })
+            repo.setTopicFilter(emptySet()).join()
+            val cleared = assertIs<FeedState.Content>(repo.feed.first()).cards
+
+            assertEquals(original, cleared, "clearing the filter restores the same cards")
+            assertEquals(prefsBefore, h.prefs.value, "preferences unchanged")
+            assertEquals(listOf(prefsBefore), prefEmissions, "no preference write during filtering")
+            assertEquals(tablesBefore, storeTables(), "hidden, saved, history, custom feeds and articles unchanged")
         }
 
     @Test
