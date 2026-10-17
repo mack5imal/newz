@@ -63,6 +63,8 @@ fun FlapTile(
         modifier =
             modifier
                 .height(size.height)
+                // Intrinsic width: the full-width split rule would otherwise stretch the tile across its row.
+                .width(IntrinsicSize.Max)
                 .widthIn(min = size.width)
                 .clip(ControlShape)
                 .background(c.tile),
@@ -186,12 +188,8 @@ fun RankTile(
     rank: Int,
     modifier: Modifier = Modifier,
 ) {
-    // Intrinsic width: the tile's full-width split rule would otherwise fill the rest of a row.
     FlapTile(
         text = rank.toString(),
-        modifier =
-            modifier
-                .width(IntrinsicSize.Max)
-                .clearAndSetSemantics { contentDescription = "Rank $rank" },
+        modifier = modifier.clearAndSetSemantics { contentDescription = "Rank $rank" },
     )
 }

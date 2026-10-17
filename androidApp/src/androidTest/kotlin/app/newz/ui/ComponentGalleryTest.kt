@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -25,6 +26,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasNoClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -79,6 +81,7 @@ import app.newz.ui.components.TopicChipRow
 import app.newz.ui.theme.LocalNewzPalette
 import app.newz.ui.theme.NewzIcons
 import app.newz.ui.theme.NewzTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -178,6 +181,32 @@ class ComponentGalleryTest {
             "headline overflows at Extra large: ${layout.lineCount} lines, ${layout.size}",
             layout.hasVisualOverflow,
         )
+    }
+
+    @Test
+    fun flapTilesKeepTheirSizeSoTheOutletKeepsTheStrip() {
+        // Regression: each tile's full-width split rule stretched it across the row, squeezing the
+        // outlet name into a one-letter column as tall as a photo.
+        setGallery {
+            Column(Modifier.width(STRIP_WIDTH.dp)) {
+                CardStrip(outlet = "The Evening Courier", age = "5m")
+                FlapTile(text = "N", modifier = Modifier.testTag(TAG_TILE))
+            }
+        }
+        val px = { dp: Int -> with(composeRule.density) { dp.dp.roundToPx() } }
+        assertEquals(
+            px(TILE_WIDTH),
+            composeRule
+                .onNodeWithTag(TAG_TILE)
+                .fetchSemanticsNode()
+                .size.width,
+        )
+        val age = composeRule.onNode(hasContentDescription("5 minutes ago")).fetchSemanticsNode()
+        assertTrue("age is ${age.size.width}px wide", age.size.width <= px(2 * TILE_WIDTH + TILE_GAP) + 1)
+        val outlet = composeRule.onNode(hasText("The Evening Courier"), useUnmergedTree = true).fetchSemanticsNode()
+        // Squeezed, the outlet was one letter wide and as tall as a photo.
+        assertTrue("outlet is ${outlet.size.width}px wide", outlet.size.width >= px(OUTLET_MIN_WIDTH))
+        assertTrue("outlet is ${outlet.size.height}px tall", outlet.size.height <= px(OUTLET_MAX_HEIGHT))
     }
 
     @Composable
@@ -346,6 +375,12 @@ class ComponentGalleryTest {
         const val TAG_GROUP_THREE = "group-3"
         const val TAG_FLAP_AGE = "flap-age"
         const val TAG_RANK = "rank"
+        const val TAG_TILE = "flap-tile"
+        const val STRIP_WIDTH = 360
+        const val TILE_WIDTH = 24
+        const val TILE_GAP = 3
+        const val OUTLET_MIN_WIDTH = 120
+        const val OUTLET_MAX_HEIGHT = 48
         const val TAG_DISABLED_ROW = "sheet-row-disabled"
         const val TAG_ENABLED_ROW = "sheet-row-enabled"
         const val TAG_PLAIN_SNACKBAR = "snackbar-plain"
