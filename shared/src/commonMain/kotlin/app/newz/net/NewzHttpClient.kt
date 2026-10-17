@@ -43,6 +43,8 @@ sealed interface FetchResult {
         val charset: String?,
         /** The URL after redirects. */
         val finalUrl: String,
+        /** The HTTP status of the final response (always 2xx). */
+        val status: Int = 200,
     ) : FetchResult
 
     /** The body exceeded the cap; reading stopped at the first byte past it. */
@@ -158,6 +160,7 @@ suspend fun HttpClient.fetchCapped(
             finalUrl =
                 response.call.request.url
                     .toString(),
+            status = response.status.value,
         )
     }
 

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Probes every bundled catalog feed with the app's own HTTP client and parser, writes
+# catalog/health-report.md and prints "healthy: <h>/<n> (<pct>%)". Exits non-zero when the
+# shipped catalog is under 90% healthy.
+#   scripts/check-catalog-feeds [--file <json>] [--report <md>] [--json <out.json>]
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec ./gradlew -q :shared:checkCatalogFeeds "$@"
