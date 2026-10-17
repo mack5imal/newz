@@ -20,7 +20,8 @@ import io.ktor.client.HttpClient
 
 /**
  * The app's only image loader (SPEC S2): Coil 3 over the shared guarded [newzHttpClient], with
- * [HostGuardInterceptor] in front so a Google-hosted image URL fails before any request is made.
+ * [HostGuardInterceptor] in front so a Google-hosted image URL fails before any request is made,
+ * and [MinSourceWidthDecoder] ahead of Coil's decoders for requests that set [minSourceWidth].
  * Memory and disk caches are on. Service-loaded fetchers are off, so Coil never builds its own
  * unguarded HTTP client.
  */
@@ -49,6 +50,7 @@ object NewzImageLoader {
             .serviceLoaderEnabled(false)
             .components {
                 add(HostGuardInterceptor())
+                add(MinSourceWidthDecoder())
                 add(KtorNetworkFetcherFactory(httpClient = httpClient))
             }.memoryCache {
                 MemoryCache.Builder().maxSizePercent(context, MEMORY_CACHE_FRACTION).build()

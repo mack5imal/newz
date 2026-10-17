@@ -26,12 +26,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
+import app.newz.ui.image.MIN_PICTURE_SOURCE_WIDTH
+import app.newz.ui.image.minSourceWidth
 import app.newz.ui.image.rememberNewzImageLoader
 import app.newz.ui.theme.NewzIcons
 import app.newz.ui.theme.NewzTokens
@@ -39,6 +42,7 @@ import app.newz.ui.theme.SignageText
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
+import coil3.request.ImageRequest
 
 /**
  * `ArticleCard` — one article in the feed: a `card` surface with a [CardStrip], the
@@ -144,7 +148,11 @@ internal val PhotoAlignment = BiasAlignment(horizontalBias = 0f, verticalBias = 
  */
 private enum class PictureState { Loading, Shown, NoPicture }
 
-/** The [PictureState] for Coil's [state]: a load that fails (or whose host is blocked) has no picture. */
+/**
+ * The [PictureState] for Coil's [state]: a load that fails (or whose host is blocked) has no
+ * picture, and so has one whose source is narrower than [MIN_PICTURE_SOURCE_WIDTH] (the
+ * request's [minSourceWidth] fails it with [app.newz.ui.image.TinyImageException]).
+ */
 private fun pictureStateOf(state: AsyncImagePainter.State): PictureState =
     when (state) {
         is AsyncImagePainter.State.Success -> PictureState.Shown
@@ -155,9 +163,10 @@ private fun pictureStateOf(state: AsyncImagePainter.State): PictureState =
 /**
  * `ArticleImage` — the article photo at full width and 16:9, cropped to fill (anchored by
  * [PhotoAlignment], so tall photos keep their top). It shows the `image-placeholder` with
- * `image-hatch` lines every 11 dp until it loads; if loading fails or the host is blocked it is
- * replaced by the [NoImagePanel] for [topic], so a failed picture looks the same as none.
- * Loaded only through the guarded [imageLoader].
+ * `image-hatch` lines every 11 dp until it loads; if loading fails, the host is blocked or the
+ * source is under [MIN_PICTURE_SOURCE_WIDTH] px wide (a thumbnail that would look blocky at full
+ * width) it is replaced by the [NoImagePanel] for [topic], so an unusable picture looks the same
+ * as none. Loaded only through the guarded [imageLoader].
  */
 @Composable
 fun ArticleImage(
@@ -168,6 +177,15 @@ fun ArticleImage(
     imageLoader: ImageLoader = rememberNewzImageLoader(),
 ) {
     val c = palette()
+    val context = LocalContext.current
+    val request =
+        remember(url, context) {
+            ImageRequest
+                .Builder(context)
+                .data(url)
+                .minSourceWidth(MIN_PICTURE_SOURCE_WIDTH)
+                .build()
+        }
     var picture by remember(url) { mutableStateOf(PictureState.Loading) }
     if (picture == PictureState.NoPicture) {
         NoImagePanel(topic = topic, modifier = modifier)
@@ -182,7 +200,7 @@ fun ArticleImage(
             .hatch(c.imagePlaceholder, c.imageHatch, NewzTokens.imageHatchSpacing),
     ) {
         AsyncImage(
-            model = url,
+            model = request,
             contentDescription = contentDescription,
             imageLoader = imageLoader,
             contentScale = ContentScale.Crop,

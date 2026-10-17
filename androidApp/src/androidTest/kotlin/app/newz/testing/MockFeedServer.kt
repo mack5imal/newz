@@ -26,7 +26,8 @@ import kotlin.time.Instant
  * - `GET /feed/<n>.xml` — feed `n` (0 until [feedCount]) as RSS 2.0, built from [feed]`(n)`:
  *   its [FeedConfig.items], after [FeedConfig.delayMs], with [FeedConfig.status] (a non-200
  *   status sends an empty body).
- * - `GET /img/<name>.png` — a small solid PNG, for article images ([imageUrl]).
+ * - `GET /img/<name>.png` — a solid 320×180 PNG, for article images ([imageUrl]); a name
+ *   starting `tiny-` gets a 90×90 one instead ([tinyImageUrl]), under the app's 300 px minimum.
  *
  * Typical use:
  * ```
@@ -66,7 +67,8 @@ class MockFeedServer(
 
     private val server = MockWebServer()
     private val configs = List(feedCount) { FeedConfig() }
-    private val png: ByteArray by lazy { solidPng() }
+    private val png: ByteArray by lazy { solidPng(IMAGE_W, IMAGE_H) }
+    private val tinyPng: ByteArray by lazy { solidPng(TINY_SIZE, TINY_SIZE) }
 
     /** Every request served so far. */
     val requests = AtomicInteger()
@@ -122,6 +124,9 @@ class MockFeedServer(
     ): String = "$baseUrl/article/$feed/$item"
 
     fun imageUrl(name: String): String = "$baseUrl/img/$name.png"
+
+    /** A 90×90 picture, like Phys.org's feed thumbnails: too small for the app to show. */
+    fun tinyImageUrl(name: String): String = "$baseUrl/img/tiny-$name.png"
 
     /**
      * Gives every feed [itemsPerFeed] items with [Headlines.next] titles (never similar enough to
@@ -198,10 +203,11 @@ class MockFeedServer(
                     .build()
             }
             if (IMAGE_PATH.matches(path)) {
+                val bytes = if (path.startsWith("/img/tiny-")) tinyPng else png
                 return MockResponse
                     .Builder()
                     .setHeader("Content-Type", "image/png")
-                    .body(Buffer().write(png))
+                    .body(Buffer().write(bytes))
                     .build()
             }
             return notFound()
@@ -238,8 +244,11 @@ class MockFeedServer(
             .replace(">", "&gt;")
             .replace("\"", "&quot;")
 
-    private fun solidPng(): ByteArray {
-        val bitmap = Bitmap.createBitmap(IMAGE_W, IMAGE_H, Bitmap.Config.ARGB_8888)
+    private fun solidPng(
+        width: Int,
+        height: Int,
+    ): ByteArray {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(Color.rgb(0x6A, 0x8F, 0xB8))
         return ByteArrayOutputStream().use { out ->
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
@@ -249,8 +258,9 @@ class MockFeedServer(
 
     companion object {
         const val HOST = "127.0.0.1"
-        private const val IMAGE_W = 32
-        private const val IMAGE_H = 18
+        private const val IMAGE_W = 320
+        private const val IMAGE_H = 180
+        private const val TINY_SIZE = 90
         private val FEED_PATH = Regex("/feed/(\\d+)\\.xml")
         private val IMAGE_PATH = Regex("/img/[^/]+\\.png")
     }
