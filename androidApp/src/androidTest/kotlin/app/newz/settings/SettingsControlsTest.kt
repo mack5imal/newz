@@ -19,6 +19,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
@@ -59,6 +60,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.math.abs
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 
@@ -249,7 +251,22 @@ class SettingsControlsTest {
         openSettings()
         // Clearing asks first: Cancel keeps the history, Clear history clears it.
         val clear = hasText("Clear reading history") and hasClickAction()
-        compose.onNode(clear).performScrollTo().performClick()
+        // The compact button sits centred in its row and keeps a 48 dp touch target (B13).
+        val button = compose.onNode(clear).performScrollTo().fetchSemanticsNode()
+        val screenWidth =
+            compose
+                .onRoot()
+                .fetchSemanticsNode()
+                .size.width
+        val centre = button.positionInRoot.x + button.size.width / 2f
+        assertTrue("centred: $centre of $screenWidth", abs(centre - screenWidth / 2f) <= 2f)
+        val minPx =
+            48f *
+                InstrumentationRegistry
+                    .getInstrumentation()
+                    .targetContext.resources.displayMetrics.density - 0.5f
+        assertTrue("48 dp tall: ${button.size.height}", button.size.height >= minPx)
+        compose.onNode(clear).performClick()
         compose.waitForText("Clear reading history?")
         compose
             .onNodeWithText(

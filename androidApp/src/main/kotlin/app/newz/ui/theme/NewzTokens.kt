@@ -361,6 +361,12 @@ object NewzTokens {
     val typeThumbTopic = signage(FontWeight.ExtraBold, 20.sp, 20.sp)
     val typeBanner = text(FontWeight.SemiBold, 15.sp, 20.sp)
     val typeSnackbarAction = signage(FontWeight.ExtraBold, 18.sp, tracking = 0.08.em)
+
+    // Button `compact` (Settings' Clear reading history): drawn 36 tall, padding 0 14, 16 sp text,
+    // inside the usual 48 dp touch target.
+    val typeButtonCompact = signage(FontWeight.ExtraBold, 16.sp, tracking = 0.08.em)
+    val buttonCompactHeight = 36.dp
+    val buttonCompactPaddingH = 14.dp
     val gapIconLabel = 6.dp
     val navButtonPaddingH = 10.dp
     val chipRowTopLight = 10.dp

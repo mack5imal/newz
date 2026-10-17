@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -32,7 +33,8 @@ enum class ButtonVariant { Primary, Outline, Text, Disabled }
  * 20 dp [icon] with gap 8, `type-button`, `radius-control` and a 2 dp border. [wide] makes it
  * full width. A Disabled button (or [enabled] false) can't be tapped. [contentColor] overrides
  * the Outline/Text border and text colour (the `sky` outline on a `BoardPanel`); [trailingIcon]
- * follows the label (onboarding's Continue arrow).
+ * follows the label (onboarding's Continue arrow). [compact] draws a smaller button (36 tall,
+ * padding 0 14, 16 sp text) centred in the same 48 dp touch target; it ignores [wide].
  */
 @Composable
 fun Button(
@@ -45,6 +47,7 @@ fun Button(
     enabled: Boolean = true,
     contentColor: Color? = null,
     trailingIcon: ImageVector? = null,
+    compact: Boolean = false,
 ) {
     val c = palette()
     val isEnabled = enabled && variant != ButtonVariant.Disabled
@@ -76,6 +79,10 @@ fun Button(
             content = contentColor ?: c.ink
         }
     }
+    if (compact) {
+        CompactButton(text, onClick, modifier, isEnabled, fill, border, content)
+        return
+    }
     val paddingH = if (variant == ButtonVariant.Text) NewzTokens.spaceM else NewzTokens.spaceXl
     Row(
         modifier =
@@ -93,6 +100,45 @@ fun Button(
         if (icon != null) NewzIcon(icon, content, size = NewzTokens.iconSizeInControl)
         SignageText(text = text, style = NewzTokens.typeButton, color = content, textAlign = TextAlign.Center)
         if (trailingIcon != null) NewzIcon(trailingIcon, content, size = NewzTokens.iconSizeInControl)
+    }
+}
+
+/** The [Button] `compact` size: the 48 dp target is tappable, the drawn button sits centred in it. */
+@Composable
+private fun CompactButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    enabled: Boolean,
+    fill: Color,
+    border: Color,
+    content: Color,
+) {
+    Box(
+        modifier =
+            modifier
+                .defaultMinSize(minWidth = NewzTokens.touchTarget, minHeight = NewzTokens.touchTarget)
+                .clip(ControlShape)
+                .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .heightIn(min = NewzTokens.buttonCompactHeight)
+                    .clip(ControlShape)
+                    .background(fill)
+                    .border(NewzTokens.borderControl, border, ControlShape)
+                    .padding(horizontal = NewzTokens.buttonCompactPaddingH),
+            contentAlignment = Alignment.Center,
+        ) {
+            SignageText(
+                text = text,
+                style = NewzTokens.typeButtonCompact,
+                color = content,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 

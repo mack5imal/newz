@@ -51,8 +51,9 @@ class SettingsDestinations(
 private val TEXT_SIZES = listOf(TextSize.SMALL, TextSize.DEFAULT, TextSize.LARGE, TextSize.EXTRA_LARGE)
 private val TEXT_SIZE_LABELS = listOf("Small", "Default", "Large", "Extra large")
 
-/** Text start inside a `ListRow` with an icon: 16 padding + 22 icon + 14 gap. */
-private val ROW_TEXT_INSET = NewzTokens.spaceL + NewzTokens.iconSize + NewzTokens.spaceCardGap
+/** The Better pictures row's subtitle, kept on one source line so the HANDOFF copy check finds it. */
+@Suppress("ktlint:standard:max-line-length", "ktlint:standard:property-naming")
+private const val BETTER_PICTURES_SUBTITLE = "When a feed’s picture is missing or tiny, read the start of the article’s page to find a better one."
 
 // design: settings
 // design: settings-sources
@@ -156,22 +157,20 @@ fun SettingsScreen(
                 },
             )
             Divider()
-            Button(
-                text = "Clear reading history",
-                onClick = { confirmClear = true },
-                variant = ButtonVariant.Outline,
-                modifier =
-                    Modifier.padding(
-                        start = ROW_TEXT_INSET,
-                        top = NewzTokens.spaceS,
-                        bottom = NewzTokens.spaceS,
-                    ),
-            )
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(vertical = NewzTokens.spaceXs),
+                contentAlignment = Alignment.Center,
+            ) {
+                Button(
+                    text = "Clear reading history",
+                    onClick = { confirmClear = true },
+                    variant = ButtonVariant.Outline,
+                    compact = true,
+                )
+            }
             ListRow(
                 title = "Better pictures from article pages",
-                subtitle =
-                    "When a feed’s picture is missing or tiny, read the start of the article’s page to find " +
-                        "a better one.",
+                subtitle = BETTER_PICTURES_SUBTITLE,
                 icon = NewzIcons.iconImage,
                 trailing = {
                     Switch(
