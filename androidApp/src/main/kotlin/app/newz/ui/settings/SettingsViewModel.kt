@@ -10,6 +10,7 @@ import app.newz.filter.CUSTOM_TOPIC_PREFIX
 import app.newz.filter.customTopicId
 import app.newz.local.ZipResolver
 import app.newz.store.CustomFeed
+import app.newz.store.HiddenArticle
 import app.newz.store.Level
 import app.newz.store.TextSize
 import app.newz.store.UserPrefs
@@ -34,6 +35,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
@@ -102,6 +104,11 @@ class SettingsViewModel(
     private val countsState = MutableStateFlow(StoreCounts())
     val counts: StateFlow<StoreCounts> = countsState.asStateFlow()
 
+    private val hiddenState = MutableStateFlow<List<HiddenArticle>?>(null)
+
+    /** Hidden articles, newest hidden first; null until [loadHidden] has read them. */
+    val hidden: StateFlow<List<HiddenArticle>?> = hiddenState.asStateFlow()
+
     private val messageState = MutableStateFlow<FeedMessage?>(null)
     val message: StateFlow<FeedMessage?> = messageState.asStateFlow()
 
@@ -147,6 +154,35 @@ class SettingsViewModel(
             withContext(Dispatchers.IO) { graph.articleStore.clearHistory() }
             graph.feedRepository.invalidate()
             showMessage(FeedMessage("Reading history cleared"))
+        }
+    }
+
+    // Hidden articles
+
+    fun now(): Instant = graph.clock()
+
+    /** Forgets hides older than 30 days, then reads the rest, newest first. */
+    fun loadHidden() {
+        viewModelScope.launch {
+            val store = graph.articleStore
+            hiddenState.value =
+                withContext(Dispatchers.IO) {
+                    store.pruneHidden(graph.clock())
+                    store.listHidden().sortedByDescending { it.hiddenAt }
+                }
+        }
+    }
+
+    /**
+     * Restore: the row leaves the list and the article is back in the feed, when it is still
+     * inside the 7-day window (older articles are no longer cached, so they stay out).
+     */
+    fun restoreHidden(articleId: String) {
+        hiddenState.value = hiddenState.value?.filterNot { it.articleId == articleId }
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { graph.articleStore.unhide(articleId) }
+            graph.feedRepository.invalidate()
+            reload()
         }
     }
 
@@ -415,6 +451,28 @@ class SettingsViewModel(
 
         /** "Oct 12": the short date on "Not loading since" and "Removed" lines, in the phone's time zone. */
         fun shortDate(at: Instant): String = DATE.format(at.toJavaInstant().atZone(ZoneId.systemDefault()))
+
+        private val WEEKDAY = DateTimeFormatter.ofPattern("EEE", Locale.US)
+
+        /**
+         * `{when}` on a hidden row: "today", "yesterday", the weekday ("Tue") within the last
+         * week, else the date ("Oct 10"), in the phone's time zone.
+         */
+        fun hiddenWhen(
+            at: Instant,
+            now: Instant,
+        ): String {
+            val zone = ZoneId.systemDefault()
+            val day = at.toJavaInstant().atZone(zone).toLocalDate()
+            val today = now.toJavaInstant().atZone(zone).toLocalDate()
+            val days = ChronoUnit.DAYS.between(day, today)
+            return when {
+                days <= 0L -> "today"
+                days == 1L -> "yesterday"
+                days < 7L -> WEEKDAY.format(day)
+                else -> DATE.format(day)
+            }
+        }
 
         /** [old] order with [item] put back where it was, keeping anything added since. */
         internal fun restoreOrder(

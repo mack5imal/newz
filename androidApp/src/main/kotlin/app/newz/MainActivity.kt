@@ -25,7 +25,12 @@ import app.newz.ui.nav.Screen
 import app.newz.ui.nav.rememberBackStack
 import app.newz.ui.onboarding.OnboardingScreen
 import app.newz.ui.onboarding.OnboardingViewModel
+import app.newz.ui.saved.SavedScreen
+import app.newz.ui.saved.SavedViewModel
 import app.newz.ui.settings.AboutScreen
+import app.newz.ui.settings.BackupScreen
+import app.newz.ui.settings.BackupViewModel
+import app.newz.ui.settings.HiddenScreen
 import app.newz.ui.settings.SettingsDestinations
 import app.newz.ui.settings.SettingsScreen
 import app.newz.ui.settings.SettingsViewModel
@@ -96,6 +101,22 @@ private fun NewzNavigation(
 
             Screen.Topics -> {
                 TopicsScreen(viewModel = viewModel { SettingsViewModel(graph) }, onBack = backStack::pop)
+            }
+
+            Screen.Hidden -> {
+                HiddenScreen(viewModel = viewModel { SettingsViewModel(graph) }, onBack = backStack::pop)
+            }
+
+            Screen.Saved -> {
+                SavedScreen(viewModel = viewModel { SavedViewModel(graph) }, onBack = backStack::pop)
+            }
+
+            Screen.Backup -> {
+                BackupScreen(
+                    settings = viewModel { SettingsViewModel(graph) },
+                    viewModel = viewModel { BackupViewModel(graph) },
+                    onBack = backStack::pop,
+                )
             }
 
             Screen.About -> {

@@ -28,9 +28,11 @@ import app.newz.ui.components.Button
 import app.newz.ui.components.ButtonVariant
 import app.newz.ui.components.ListRow
 import app.newz.ui.components.Panel
+import app.newz.ui.components.PlainText
 import app.newz.ui.components.SegmentedControl
 import app.newz.ui.components.Snackbar
 import app.newz.ui.components.Switch
+import app.newz.ui.feed.FeedMessage
 import app.newz.ui.nav.Screen
 import app.newz.ui.theme.LocalNewzPalette
 import app.newz.ui.theme.NewzIcons
@@ -195,7 +197,7 @@ internal fun Divider() {
 }
 
 /**
- * The frame the three Settings screens share: `AppBarSub` [title] with Back (and [trailing]), a
+ * The frame the Settings screens share: `AppBarSub` [title] with Back (and [trailing]), a
  * scrolling column of panels on `paper`, and the view model's message `Snackbar` (with Undo when
  * the action has one).
  */
@@ -208,8 +210,22 @@ internal fun SettingsFrame(
     trailing: (@Composable RowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val c = LocalNewzPalette.current
     val message by viewModel.message.collectAsState()
+    ScreenFrame(screen, title, message, viewModel::dismissMessage, onBack, trailing, content)
+}
+
+/** [SettingsFrame] for any screen with its own [message] (a `Snackbar`, cleared by [onDismissMessage]). */
+@Composable
+internal fun ScreenFrame(
+    screen: Screen,
+    title: String,
+    message: FeedMessage?,
+    onDismissMessage: () -> Unit,
+    onBack: () -> Unit,
+    trailing: (@Composable RowScope.() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val c = LocalNewzPalette.current
     Box(
         Modifier
             .fillMaxSize()
@@ -234,12 +250,23 @@ internal fun SettingsFrame(
                 actionLabel = m.actionLabel,
                 onAction = {
                     m.onAction()
-                    viewModel.dismissMessage()
+                    onDismissMessage()
                 },
-                onTimeout = viewModel::dismissMessage,
+                onTimeout = onDismissMessage,
                 timeoutKey = m.key,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
     }
+}
+
+/** An intro line under the app bar (`type-intro` in `ink-muted`, padding 0 16 12). */
+@Composable
+internal fun Intro(text: String) {
+    PlainText(
+        text = text,
+        style = NewzTokens.typeIntro,
+        color = LocalNewzPalette.current.inkMuted,
+        modifier = Modifier.padding(start = NewzTokens.spaceL, end = NewzTokens.spaceL, bottom = NewzTokens.spaceM),
+    )
 }

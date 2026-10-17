@@ -237,7 +237,7 @@ fun SegmentedControl(
 /**
  * `Checkbox` — a 24 square with a 2 dp `line` border and `radius-control`; checked, it has a
  * `button` fill and a 16 dp `icon-check` in `on-button`. Its 48 dp row, with the [label], is
- * the touch target.
+ * the touch target. A [subtitle] sets a `type-row-sub` line under the label.
  */
 @Composable
 fun Checkbox(
@@ -245,6 +245,7 @@ fun Checkbox(
     onCheckedChange: (Boolean) -> Unit,
     label: String,
     modifier: Modifier = Modifier,
+    subtitle: String? = null,
 ) {
     val c = palette()
     Row(
@@ -267,6 +268,13 @@ fun Checkbox(
         ) {
             if (checked) NewzIcon(NewzIcons.iconCheck, c.onButton, size = NewzTokens.checkboxIcon)
         }
-        PlainText(text = label, style = NewzTokens.typeRowTitle, color = c.ink, modifier = Modifier.weight(1f))
+        if (subtitle == null) {
+            PlainText(text = label, style = NewzTokens.typeRowTitle, color = c.ink, modifier = Modifier.weight(1f))
+        } else {
+            Column(Modifier.weight(1f)) {
+                PlainText(text = label, style = NewzTokens.typeRowTitle, color = c.ink)
+                PlainText(text = subtitle, style = NewzTokens.typeRowSub, color = c.inkMuted)
+            }
+        }
     }
 }
