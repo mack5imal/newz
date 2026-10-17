@@ -336,6 +336,57 @@ class ComponentGalleryTest {
             .assertExists()
     }
 
+    private var wordmarkBusy by mutableStateOf(false)
+
+    /** A [FlapWordmark] driven by [wordmarkBusy], on a test clock that only moves when told to. */
+    private fun setWordmark() {
+        composeRule.mainClock.autoAdvance = false
+        setGallery { Box(Modifier.testTag(TAG_WORDMARK)) { FlapWordmark(busy = wordmarkBusy) } }
+        composeRule.mainClock.advanceTimeByFrame()
+    }
+
+    /** The word the wordmark's tiles show after [ms] more milliseconds. */
+    private fun wordmarkAfter(ms: Long): String {
+        composeRule.mainClock.advanceTimeBy(ms)
+        return lettersIn(TAG_WORDMARK).joinToString("") { it.text }
+    }
+
+    @Test
+    fun wordmarkPlaysAWholeCycleForAShortLoad() {
+        // B18: a load that ends in 200 ms still flips the tiles all the way back to NEWZ (~2.2 s).
+        setWordmark()
+        assertEquals("NEWZ", wordmarkAfter(0))
+        wordmarkBusy = true
+        assertTrue(wordmarkAfter(200) != "NEWZ")
+        wordmarkBusy = false
+        val seen = mutableSetOf<String>()
+        repeat(9) { seen += wordmarkAfter(FLIP_MS) } // to ~1.8 s: the last tile is still flipping
+        assertFalse("landed early: $seen", "NEWZ" in seen)
+        assertTrue("tiles barely moved: $seen", seen.size >= 5)
+        assertEquals("NEWZ", wordmarkAfter(3 * FLIP_MS)) // ~2.3 s
+        assertEquals("NEWZ", wordmarkAfter(4_000))
+    }
+
+    @Test
+    fun wordmarkKeepsFlippingForALongLoadAndStopsOnNewz() {
+        setWordmark()
+        wordmarkBusy = true
+        assertTrue(wordmarkAfter(500) != "NEWZ")
+        assertEquals("NEWZ", wordmarkAfter(1_900)) // 2.4 s: first cycle landed, holding
+        assertTrue("no second cycle", wordmarkAfter(1_600) != "NEWZ") // 4.0 s: flipping again
+        assertTrue(wordmarkAfter(1_000) != "NEWZ") // 5.0 s
+        wordmarkBusy = false
+        assertTrue("stopped mid-cycle", wordmarkAfter(400) != "NEWZ") // finishes the cycle
+        assertEquals("NEWZ", wordmarkAfter(1_000)) // 6.4 s
+        assertEquals("NEWZ", wordmarkAfter(5_000))
+    }
+
+    @Test
+    fun wordmarkStaysStillWhenNotBusy() {
+        setWordmark()
+        repeat(10) { assertEquals("NEWZ", wordmarkAfter(500)) }
+    }
+
     @Test
     fun failedImageLoadShowsTheDecorativeTopicPanel() {
         setGallery {
@@ -533,6 +584,7 @@ class ComponentGalleryTest {
         const val TAG_ROW_SHORT = "tiles-short"
         const val TAG_WORDMARK = "wordmark"
         const val TAG_WORDMARK_BUSY = "wordmark-busy"
+        const val FLIP_MS = 180L
         const val TAG_ROW_TWO_WORDS = "tiles-two-words"
         const val TAG_ROW_SMALL = "tiles-small"
         const val TAG_ROW_CUT = "tiles-cut"

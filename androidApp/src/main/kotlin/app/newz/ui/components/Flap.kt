@@ -1,5 +1,7 @@
 package app.newz.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateValue
@@ -19,11 +21,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.InfiniteAnimationPolicy
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -34,6 +43,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.sp
 import app.newz.ui.theme.NewzTokens
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
 
 /**
  * `FlapTile` — the split-flap character: a `tile` rectangle, 24×32 (18×24 [small]),
@@ -141,7 +153,10 @@ private const val ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 private const val FIRST_TILE_FLIPS = 6
 private const val TILE_FLIP_STAGGER = 2
 private const val HOLD_STEPS = 8
-private val CYCLE_STEPS = FIRST_TILE_FLIPS + TILE_FLIP_STAGGER * (BOARD_WORD.length - 1) + HOLD_STEPS
+
+/** Steps until the last tile lands on its letter of "NEWZ". */
+private val LANDING_STEPS = FIRST_TILE_FLIPS + TILE_FLIP_STAGGER * (BOARD_WORD.length - 1)
+private val CYCLE_STEPS = LANDING_STEPS + HOLD_STEPS
 
 /** The letter tile [index] shows at [step]: it flips one letter per step until it reaches its letter of "NEWZ". */
 internal fun boardLetter(
@@ -169,13 +184,69 @@ private fun rememberBoardStep(): Int {
     return step
 }
 
+/** Flips a still board from the start ([step] 0) until all four tiles spell "NEWZ": one cycle. */
+private suspend fun Animatable<Float, AnimationVector1D>.flipToNewz() {
+    snapTo(0f)
+    animateTo(
+        LANDING_STEPS.toFloat(),
+        tween(LANDING_STEPS * NewzTokens.flapFlip, easing = LinearEasing),
+    )
+}
+
+/**
+ * The wordmark's step (B18). Each time [busy] turns true the tiles play at least one whole
+ * cycle, flipping from the start until they spell NEWZ, so a load that ends within a moment still
+ * shows the board turning instead of a flicker. While still busy when a cycle lands, they hold
+ * NEWZ as long as the `LoadingBoard` does and flip again; once a cycle lands and [busy] is false
+ * they stay on NEWZ. With animations switched off (animator duration scale 0) they stay still.
+ */
+@Composable
+private fun rememberWordmarkStep(busy: Boolean): Int {
+    val board = remember { Animatable(LANDING_STEPS.toFloat()) }
+    val latestBusy by rememberUpdatedState(busy)
+    LaunchedEffect(board) {
+        val busyNow = snapshotFlow { latestBusy }
+        while (true) {
+            busyNow.first { it }
+            if (coroutineContext[MotionDurationScale]?.scaleFactor == 0f) {
+                busyNow.first { !it }
+                continue
+            }
+            board.flipToNewz()
+            if (!latestBusy) continue
+            // Flipping on for as long as the load lasts has no end of its own, so it runs as an
+            // infinite animation (which Compose tests switch off unless they drive the clock).
+            val keepFlipping: suspend () -> Unit = {
+                while (latestBusy) {
+                    board.animateTo(
+                        CYCLE_STEPS.toFloat(),
+                        tween(HOLD_STEPS * NewzTokens.flapFlip, easing = LinearEasing),
+                    )
+                    if (latestBusy) board.flipToNewz()
+                }
+            }
+            val policy = coroutineContext[InfiniteAnimationPolicy]
+            try {
+                if (policy == null) keepFlipping() else policy.onInfiniteOperation(keepFlipping)
+            } catch (stopped: CancellationException) {
+                coroutineContext.ensureActive()
+                board.snapTo(LANDING_STEPS.toFloat())
+                busyNow.first { !it }
+            }
+        }
+    }
+    val step by remember { derivedStateOf { board.value.toInt() } }
+    return step
+}
+
 /**
  * `FlapWordmark` — the "Newz" wordmark in the app bar and the onboarding header: four
  * [FlapTile]s spelling N E W Z at `tile-size-wordmark` (28×38), gap 3: a `wordmark-tile` (`sky`)
  * face, a `wordmark-letter` (`navy`) letter and a `wordmark-rule` split line, the app icon's tile
- * turned over so it stands out on the navy bar in both themes. While [busy] (the feed is loading or refreshing) the tiles flip through
- * letters back to NEWZ like the `LoadingBoard`; otherwise they stay still. Read as the [label]
- * "Newz", a heading when [heading] (the app bar).
+ * turned over so it stands out on the navy bar in both themes. When [busy] turns true (the feed is
+ * loading or refreshing) the tiles flip through letters back to NEWZ like the `LoadingBoard`: at
+ * least one whole cycle, then again for as long as [busy] lasts, always stopping on NEWZ; otherwise
+ * they stay still. Read as the [label] "Newz", a heading when [heading] (the app bar).
  */
 @Composable
 fun FlapWordmark(
@@ -186,7 +257,7 @@ fun FlapWordmark(
     heading: Boolean = true,
 ) {
     val c = palette()
-    val step = if (busy) rememberBoardStep() else CYCLE_STEPS
+    val step = rememberWordmarkStep(busy)
     Row(
         modifier =
             modifier.clearAndSetSemantics {
