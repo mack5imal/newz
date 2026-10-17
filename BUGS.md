@@ -25,6 +25,40 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
   contacts Google; no third-party cookies; same blocked-host rules as the feed.
 - **Status:** deferred (2026-10-17). Kept Custom Tabs; to be tried on a real phone and then decide on an in-app reader.
 
+### B12 — "Change it in Settings" doesn't say where
+- **Severity:** Medium
+- **Where:** `FeedViewModel` show more/less message; Settings home's "Topics & keywords" row
+  (`SettingsScreen.kt:102`)
+- **Seen:** after Show more / Show less the message says "Change it in Settings", but nothing on
+  the Settings screen mentions levels.
+- **Cause:** the levels are on Settings › Topics & keywords (a Normal / More / Much more control
+  under each followed topic, plus "Other topics you’ve boosted"). The message dropped the screen
+  name to fit two lines, and the Settings row's subtitle only shows counts.
+- **Fix idea:** message names "Settings › Topics" (fits); the Topics & keywords row subtitle
+  mentions how often each topic appears.
+
+### B13 — Clear reading history button too big
+- **Severity:** Low
+- **Where:** `SettingsScreen.kt:159`
+- **Requested:** a smaller button, centred.
+
+### B14 — Placeholder topic tiles are left-aligned
+- **Severity:** Low
+- **Where:** `NoImagePanel` / `TopicTiles` in `ui/components/Cards.kt`
+- **Requested:** centre the tiles in the panel (screenshot 12:52).
+
+### B15 — Use the flap-tile NEWZ as the top-bar wordmark
+- **Severity:** Low (design change)
+- **Where:** `AppBarMain` in `ui/components/AppBars.kt`; refresh indicator in `ui/feed/FeedScreen.kt`
+- **Requested:** replace the plain "NEWZ" wordmark with the split-flap NEWZ tiles (matches the
+  app icon), colours adjusted to suit the bar; the pull-to-refresh band shows a plain message
+  such as "Refreshing feed…" instead of the tiles.
+
+### B16 — Theme setting (System / Light / Dark)
+- **Severity:** Low (feature request)
+- **Where:** `ui/theme/NewzTheme.kt` (follows the system today), Settings, `UserPrefs`
+- **Requested:** a Settings choice of System, Light or Dark.
+
 ## Fixed
 
 ### B2 — Running the UI tests overwrites the device's real settings
