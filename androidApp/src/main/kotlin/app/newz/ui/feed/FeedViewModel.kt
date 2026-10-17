@@ -14,7 +14,7 @@ import app.newz.filter.topicDisplayName
 import app.newz.store.Level
 import app.newz.store.UserPrefs
 import app.newz.store.flagPaywall
-import app.newz.store.labelWithMeaning
+import app.newz.store.labelWithShortMeaning
 import app.newz.store.levelOf
 import app.newz.store.lowerLevel
 import app.newz.store.muteKeyword
@@ -236,8 +236,9 @@ class FeedViewModel(
 
     /**
      * Applies [change] to [article]'s primary topic and names the new level with its meaning, e.g.
-     * "Science now at More (about 2× as often). Change it in Settings." (short enough for two lines
-     * of the message bar; Settings › Topics & keywords holds the control). Undo puts back the stored level.
+     * "Science: More (2× as often). Change it in Settings › Topics." (every built-in topic at every
+     * level fits two lines of the message bar on a 411 dp phone at the default text size; Settings ›
+     * Topics & keywords holds the control). Undo puts back the stored level.
      */
     private fun changeLevel(
         article: Article,
@@ -246,7 +247,9 @@ class FeedViewModel(
         val topic = article.primaryTopic ?: return
         var previous: Level? = null
         changePrefs(
-            text = { p -> "${topicName(topic)} now at ${p.levelOf(topic).labelWithMeaning}. Change it in Settings." },
+            text = { p ->
+                "${topicName(topic)}: ${p.levelOf(topic).labelWithShortMeaning}. Change it in Settings › Topics."
+            },
             apply = { p ->
                 previous = p.topicLevels[topic]
                 p.change(topic)

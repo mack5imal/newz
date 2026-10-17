@@ -79,6 +79,9 @@ class PrefsOpsTest {
         assertEquals("Normal (the usual share)", Level.NORMAL.labelWithMeaning)
         assertEquals("More (about 2× as often)", Level.MORE.labelWithMeaning)
         assertEquals("Much more (about 3× as often)", Level.MUCH_MORE.labelWithMeaning)
+        assertEquals("Normal (the usual share)", Level.NORMAL.labelWithShortMeaning)
+        assertEquals("More (2× as often)", Level.MORE.labelWithShortMeaning)
+        assertEquals("Much more (3× as often)", Level.MUCH_MORE.labelWithShortMeaning)
         assertEquals("Science gets the usual share of your feed.", Level.NORMAL.caption("Science"))
         assertEquals("Science comes up about 3× as often as a Normal topic.", Level.MUCH_MORE.caption("Science"))
     }

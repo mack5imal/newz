@@ -34,6 +34,12 @@ val Level.meaning: String
 /** The name with its meaning, wherever a level is named in a sentence: "More (about 2× as often)". */
 val Level.labelWithMeaning: String get() = "$label ($meaning)"
 
+/**
+ * The name with its meaning, without "about", for a message that has to stay on two lines:
+ * "More (2× as often)", "Normal (the usual share)".
+ */
+val Level.labelWithShortMeaning: String get() = "$label (${meaning.removePrefix("about ")})"
+
 /** The caption under a topic's level control, e.g. "Science comes up about 2× as often as a Normal topic." */
 fun Level.caption(topic: String): String =
     if (this == Level.NORMAL) {

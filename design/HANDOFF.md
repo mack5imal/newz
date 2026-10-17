@@ -431,7 +431,7 @@ Layout: `AppBarSub` "Settings" with back, then three `Panel`s, 14 apart.
 
 Your feed — `ListRow`s with a leading icon, title, a live subtitle and a chevron:
 - Sources (rss icon)
-- Topics & keywords (tag icon)
+- Topics & keywords (tag icon) — subtitle "{n} topics · set how often each appears", so the show-more levels can be found from here (B12)
 - Hidden articles (eye-off icon)
 - Saved (bookmark icon)
 - Find sources (search icon)
@@ -702,7 +702,7 @@ Strings are exact. Signage-styled text (see `font-signage`) displays in capitals
 - `Article hidden. Bring it back in Settings › Hidden articles.`
 - `You’re seeing more {topic} — {level} ({meaning})` (e.g. `Science`, `More`, `about 2× as often`)
 - `Show less like this`
-- `{topic} now at {level} ({meaning}). Change it in Settings.` (snackbar after Show more or Show less like this, kept to two lines; the control is in Settings › Topics & keywords; not drawn)
+- `{topic}: {level} ({meaning}). Change it in Settings › Topics.` (e.g. `Science: More (2× as often). Change it in Settings › Topics.`; snackbar after Show more or Show less like this; the meaning drops “about” so every built-in topic fits two lines on a 411 dp phone at the default text size; the control is in Settings › Topics & keywords; not drawn)
 - `Normal (the usual share)`
 - `More (about 2× as often)`
 - `Much more (about 3× as often)`
@@ -774,7 +774,7 @@ Strings are exact. Signage-styled text (see `font-signage`) displays in capitals
 - `{n} followed · {m} not loading` (e.g. `24 followed · 1 not loading`)
 - `{n} followed` (e.g. `24`; when no feed is failing; not drawn)
 - `Topics & keywords`
-- `{n} topics · {m} muted keywords` (e.g. `8 topics · 3 muted keywords`)
+- `{n} topics · set how often each appears` (e.g. `8 topics · set how often each appears`; one line; drawn as `8 topics · 3 muted keywords` before UAT round 2)
 - `Hidden articles`
 - `{n} hidden` (e.g. `6 hidden`)
 - `Saved`

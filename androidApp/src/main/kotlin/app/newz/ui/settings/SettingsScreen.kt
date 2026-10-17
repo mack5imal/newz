@@ -100,7 +100,7 @@ fun SettingsScreen(
             val topics = p.followedTopics.size + p.customTopics.size
             ListRow(
                 title = "Topics & keywords",
-                subtitle = "$topics topics · ${p.mutedKeywords.size} muted keywords",
+                subtitle = "$topics topics · set how often each appears",
                 icon = NewzIcons.iconTag,
                 onClick = { destinations.open(Screen.Topics) },
             )

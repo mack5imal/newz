@@ -352,7 +352,7 @@ class CardActionsTest {
         const val TIMEOUT = 10_000L
         const val CAUGHT_UP = "You're all caught up"
         const val ALL_FILTERED = "Nothing to show — your filters hide everything"
-        const val MESSAGE_MORE = "Science now at More (about 2× as often). Change it in Settings."
-        const val MESSAGE_NORMAL = "Science now at Normal (the usual share). Change it in Settings."
+        const val MESSAGE_MORE = "Science: More (2× as often). Change it in Settings › Topics."
+        const val MESSAGE_NORMAL = "Science: Normal (the usual share). Change it in Settings › Topics."
     }
 }
