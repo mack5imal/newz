@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,13 +21,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import app.newz.catalog.Catalog
-import app.newz.ui.components.AppIcon
 import app.newz.ui.components.BottomActionBar
 import app.newz.ui.components.FlapWordmark
 import app.newz.ui.components.PlainText
@@ -49,8 +46,8 @@ private const val PRIVACY = "No accounts and no trackers — what you read and c
 // design: onboarding
 
 /**
- * Pick your topics (design `onboarding`), shown on first launch only: the header (app icon,
- * wordmark, "News that stays on your phone." and the privacy sentence), `SplitRule`, "Pick at
+ * Pick your topics (design `onboarding`), shown on first launch only: the header (the still
+ * `FlapWordmark`, "News that stays on your phone." and the privacy sentence), `SplitRule`, "Pick at
  * least 3 topics" over the catalog's topics as `TopicChip`s in catalog order, and the
  * `BottomActionBar`. Continue is enabled with [MIN_TOPICS] picked (and, when Local is picked, a
  * saved zip); it saves the topics and calls [onFinished]. Picking Local opens the [ZipCodeSheet];
@@ -146,13 +143,7 @@ private fun OnboardingHeader() {
                 bottom = NewzTokens.onboardingHeaderBottom,
             ),
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(NewzTokens.spaceCardGap),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AppIcon()
-                FlapWordmark(busy = false, heading = false)
-            }
+            FlapWordmark(busy = false, heading = false)
             PlainText(
                 text = "News that stays on your phone.",
                 style = NewzTokens.typeHeading,

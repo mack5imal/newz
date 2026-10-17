@@ -290,7 +290,7 @@ Each entry gives what the component is, where it appears, and its exact measurem
 - `RankTile` — the rank number at the start of each row in `suggestions`: one full-size `FlapTile`, spoken as "Rank {n}".
 - `NoteRow` — the search hints, the suggestions privacy note, and the result and confirmation notes in `search` and `backup`: padding 14 16, a 22 dp icon in the text colour, gap 12, top-aligned, with text at 15/22 in `ink`, or a `type-row-title` line over a `type-row-sub` line.
 - `BottomActionBar` — the bar pinned to the bottom of `onboarding`: a `card` surface with a 2 dp `line` top border, padding 12 12 24 16 and gap 12; its status is at the left in `type-row-title` (with an optional `type-row-sub` line below) and a Primary `Button` is at the right.
-- `AppIcon` — the adaptive launcher icon, also shown at 56 dp on `onboarding`; see `app-icon`.
+- `AppIcon` — the adaptive launcher icon drawn in Compose (shown at 56 dp on `onboarding` until B19; no screen shows it now, it is kept for reuse); see `app-icon`.
 
 ## Screens
 
@@ -416,7 +416,7 @@ States:
 
 Shown on first launch only. Layout:
 - A header band in `navy`, with 20 dp side padding and 22 dp bottom padding:
-  - 18 dp below the status inset, the app icon at 56 dp beside the wordmark, gap 14 (since B15 the still `FlapWordmark` tiles, not spoken as a heading; drawn as text at 46/46 sp before). The icon is its 72 dp visible area scaled to 56 dp, with corners rounded at 16/72 of its size (about 12 dp).
+  - 18 dp below the status inset, the wordmark on its own: the still `FlapWordmark` tiles, not spoken as a heading (since B15; drawn as text at 46/46 sp before). Since B19 the app icon is no longer shown beside it (before: the icon at 56 dp, gap 14).
   - 18 dp below that, `type-heading` "News that stays on your phone."; 8 dp below, the privacy sentence in `type-body`. Both are in `sky`.
 - Then `SplitRule`, then 18 16 padding, the label "Pick at least 3 topics", and 20 `TopicChip`s in a wrap with gap 8.
 - `BottomActionBar` pinned at the bottom.

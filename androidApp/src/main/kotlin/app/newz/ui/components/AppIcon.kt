@@ -35,8 +35,9 @@ private const val VISIBLE_CORNER = 16f
 
 /**
  * `AppIcon` — the "Flap tile" launcher icon (a light-blue N on a navy split-flap tile on light
- * blue), drawn from the design's SVG geometry; shown at 56 dp on onboarding. Like a launcher, it
- * shows the canvas's 72-unit visible area scaled to [size], with corners rounded at 16/72 of it.
+ * blue), drawn from the design's SVG geometry (the onboarding header showed it at 56 dp until
+ * B19). Like a launcher, it shows the canvas's 72-unit visible area scaled to [size], with
+ * corners rounded at 16/72 of it.
  * The icon has the same colours in both themes.
  */
 @Composable
