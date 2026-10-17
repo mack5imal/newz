@@ -87,7 +87,6 @@ class FeedRepository(
     private var userMoved = false
     private val lock = Mutex()
     private val pager = FeedPager(pageSize)
-    private var selectedTopics: Set<String> = emptySet()
     private var loadedOnce = false
     private var offline = false
     private var failing: Set<String> = emptySet()
@@ -142,13 +141,6 @@ class FeedRepository(
         scope.launch {
             if (!prefs.first().readingHistoryOn) return@launch
             withContext(storeDispatcher) { store.recordOpen(article.id, article.outletId, article.topics, clock()) }
-        }
-
-    /** Sets the topic chip bar's selection (empty = all) and recomposes from the cache. */
-    fun setTopicFilter(topics: Set<String>): Job =
-        scope.launch {
-            selectedTopics = topics
-            publish(readSnapshot(), reset = true, loading = coordinator.isRunning.value)
         }
 
     /**
@@ -216,7 +208,7 @@ class FeedRepository(
         loading: Boolean,
         whileGrowing: Boolean = false,
     ) {
-        val groups = FeedComposer.compose(snapshot, catalog, selectedTopics, clock())
+        val groups = FeedComposer.compose(snapshot, catalog, clock())
         lock.withLock {
             if (whileGrowing && !growing) return
             val rerank = if (whileGrowing) reset && !userMoved else reset

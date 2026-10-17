@@ -6,7 +6,6 @@ import app.newz.dedup.StoryGrouper
 import app.newz.feed.Article
 import app.newz.filter.FeedFilter
 import app.newz.filter.FilterContext
-import app.newz.filter.applyTopicFilter
 import app.newz.store.ArticleStore
 import app.newz.store.StoredArticle
 import app.newz.store.UserPrefs
@@ -49,14 +48,14 @@ data class FeedCard(
 
 /**
  * The pure pipeline from a [FeedSnapshot] to ranked groups: cache rows to [Article]s,
- * [FeedFilter] (mutes always win), one article per URL, custom topic tags, the chip-bar topic
- * filter, [StoryGrouper] (lead = followed outlet plus reading affinity) and [FeedRanker].
+ * [FeedFilter] (mutes always win), one article per URL, custom topic tags, [StoryGrouper]
+ * (lead = followed outlet plus reading affinity) and [FeedRanker]. The topic chip filter is not
+ * applied here: the feed's view model narrows the served cards (SPEC S14).
  */
 object FeedComposer {
     fun compose(
         snapshot: FeedSnapshot,
         catalog: Catalog,
-        selectedTopics: Set<String>,
         now: Instant,
         grouper: StoryGrouper = StoryGrouper(),
     ): List<StoryGroup> {
@@ -69,10 +68,9 @@ object FeedComposer {
                 .sortedWith(compareBy<Article> { it.firstSeenAt }.thenBy { it.id })
                 .distinctBy { it.url }
                 .map { FeedFilter.withCustomTopics(it, ctx) }
-        val shown = applyTopicFilter(eligible, selectedTopics)
         val followed = followedOutletIds(prefs, catalog, snapshot.customFeedIds)
         val groups =
-            grouper.group(shown) { outletId ->
+            grouper.group(eligible) { outletId ->
                 (if (outletId in followed) 1.0 else 0.0) + snapshot.affinity.outletScore(outletId)
             }
         return FeedRanker.rank(groups, prefs, now)

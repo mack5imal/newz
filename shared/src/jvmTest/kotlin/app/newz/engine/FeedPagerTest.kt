@@ -75,8 +75,7 @@ class FeedPagerTest {
         for (f in list) store.upsert(f.feedId, f.outletId, listOf(f.topic), listOf(f.item), now)
     }
 
-    private fun ranked(): List<StoryGroup> =
-        FeedComposer.compose(FeedSnapshot.read(store, prefs), catalog, emptySet(), now)
+    private fun ranked(): List<StoryGroup> = FeedComposer.compose(FeedSnapshot.read(store, prefs), catalog, now)
 
     private fun FeedPager.drain(): List<Page> {
         val pages = mutableListOf<Page>()
