@@ -52,6 +52,12 @@ fun UserPrefs.addCustomTopic(raw: String): UserPrefs {
 fun customFeedId(feedUrl: String): String = "url-" + ArticleIds.of(CUSTOM_FEED_SCOPE, null, normalizeFeedUrl(feedUrl))
 
 /**
+ * The prefs half of [ArticleStore.followCustomFeed]: following a custom feed the user removed
+ * earlier brings it back by taking its id out of [UserPrefs.removedOutlets].
+ */
+fun UserPrefs.followCustomFeed(feed: CustomFeed): UserPrefs = restoreOutlet(feed.id)
+
+/**
  * Adds the feed [found] by discovery as a custom feed. Adding a feed whose normalised URL is
  * already a custom feed keeps the existing row and returns it, so there is never a second row.
  */

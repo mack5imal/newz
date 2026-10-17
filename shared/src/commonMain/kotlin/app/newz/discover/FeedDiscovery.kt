@@ -1,6 +1,7 @@
 package app.newz.discover
 
 import app.newz.catalog.Catalog
+import app.newz.engine.FeedFetcher
 import app.newz.feed.FeedKind
 import app.newz.feed.FeedParseException
 import app.newz.feed.FeedParser
@@ -159,30 +160,21 @@ class FeedDiscovery(
         }
     }
 
-    /** Normalised URL -> feed id for every feed [prefs] follow, catalog and custom. */
+    /**
+     * Normalised URL -> feed id for every feed [prefs] follow, by the same rule the feed engine
+     * fetches with ([FeedFetcher.followedSources]): removed outlets and removed custom feeds are
+     * not followed. A catalog feed is keyed by both its `url` and its `checkedUrl`.
+     */
     private fun followedFeedUrls(
         prefs: UserPrefs,
         customFeeds: List<CustomFeed>,
-    ): Map<String, String> {
-        val sections =
-            prefs.followedOutlets
-                .filterKeys { it !in prefs.removedOutlets }
-                .values
-                .flatten()
-                .mapNotNull(catalog::feed)
-        val local =
-            prefs.localMetroId
-                ?.takeIf { Catalog.LOCAL_TOPIC in prefs.followedTopics }
-                ?.let(catalog::localFeeds)
-                .orEmpty()
-        return buildMap {
-            for (feed in sections + local) {
-                put(normalizeFeedUrl(feed.url), feed.id)
-                feed.checkedUrl?.let { put(normalizeFeedUrl(it), feed.id) }
+    ): Map<String, String> =
+        buildMap {
+            for (source in FeedFetcher.followedSources(prefs, catalog, customFeeds)) {
+                put(normalizeFeedUrl(source.url), source.feedId)
+                catalog.feed(source.feedId)?.let { put(normalizeFeedUrl(it.url), it.id) }
             }
-            for (feed in customFeeds) put(normalizeFeedUrl(feed.url), feed.id)
         }
-    }
 
     private fun catalogFeedUrls(): Map<String, String> =
         buildMap {
@@ -197,10 +189,12 @@ class FeedDiscovery(
         private val LINK_TAG = Regex("<link\\b[^>]*>", RegexOption.IGNORE_CASE)
         private val ATTRIBUTE = Regex("([A-Za-z_:][-A-Za-z0-9_:.]*)\\s*=\\s*(\"([^\"]*)\"|'([^']*)'|([^\\s\"'>]+))")
         private val FEED_TYPES = setOf("application/rss+xml", "application/atom+xml")
+        private val HTTP_SCHEMES = setOf("http", "https")
 
         /**
-         * The first `<link rel="alternate" type="application/rss+xml|atom+xml" href>` in [html],
-         * resolved against [baseUrl]; null when there is none.
+         * The first `<link rel="alternate" type="application/rss+xml|atom+xml" href>` in [html]
+         * whose href resolves against [baseUrl] to an http(s) URL; null when there is none. A
+         * candidate that fails to resolve or has another scheme (e.g. `feed://`) is skipped.
          */
         fun feedLink(
             html: String,
@@ -221,10 +215,17 @@ class FeedDiscovery(
                         .trim()
                 val href = attrs["href"].orEmpty()
                 if ("alternate" !in rel || type !in FEED_TYPES || href.isEmpty()) continue
+                val resolved =
+                    try {
+                        URLBuilder(baseUrl).takeFrom(href)
+                    } catch (_: Exception) {
+                        continue
+                    }
+                if (resolved.protocol.name.lowercase() !in HTTP_SCHEMES) continue
                 return try {
-                    URLBuilder(baseUrl).takeFrom(href).buildString()
+                    resolved.buildString()
                 } catch (_: Exception) {
-                    null
+                    continue
                 }
             }
             return null

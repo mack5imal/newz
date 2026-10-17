@@ -12,6 +12,7 @@ import app.newz.store.ArticleStore
 import app.newz.store.CustomFeed
 import app.newz.store.UserPrefs
 import app.newz.store.createSqlDriver
+import app.newz.store.removeOutlet
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
@@ -22,8 +23,10 @@ import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
@@ -282,6 +285,81 @@ class FeedDiscoveryTest {
             store.followCustomFeed(found, now)
             store.followCustomFeed(found.copy(feedUrl = "https://tidepool.example/rss/"), now)
             assertEquals(1, store.listCustomFeeds().size)
+        }
+
+    @Test
+    fun removedCustomFeedIsFoundAgainAndReAddingRestoresItWithOneRow() =
+        runTest {
+            val e = engine(mapOf("https://tidepool.example/rss" to { respond(rss, headers = xmlHeaders) }))
+            val d = discovery(e)
+            val store = ArticleStore(createSqlDriver())
+            val found =
+                assertIs<DiscoveryResult.Found>(
+                    d.discover("tidepool.example/rss", UserPrefs(), store.listCustomFeeds()),
+                )
+            val added = store.followCustomFeed(found, now)
+            val removed = UserPrefs().followCustomFeed(added).removeOutlet(added.id, now)
+            assertTrue(added.id in removed.removedOutlets)
+
+            val again =
+                assertIs<DiscoveryResult.Found>(
+                    d.discover("tidepool.example/rss", removed, store.listCustomFeeds()),
+                )
+            val reAdded = store.followCustomFeed(again, now)
+            val restored = removed.followCustomFeed(reAdded)
+            assertEquals(added.id, reAdded.id)
+            assertEquals(1, store.listCustomFeeds().size)
+            assertFalse(added.id in restored.removedOutlets)
+            assertIs<DiscoveryResult.AlreadyFollowing>(
+                d.discover("tidepool.example/rss", restored, store.listCustomFeeds()),
+            )
+        }
+
+    @Test
+    fun removedCatalogOutletIsNotAlreadyFollowing() =
+        runTest {
+            val e = engine(mapOf("https://wire.example/tech.xml" to { respond(rss, headers = xmlHeaders) }))
+            val prefs = UserPrefs().followOutlet("wire", catalog).removeOutlet("wire", now)
+            val found =
+                assertIs<DiscoveryResult.Found>(
+                    discovery(e).discover("wire.example/tech.xml", prefs, emptyList<CustomFeed>()),
+                )
+            assertEquals("wire-tech", found.catalogFeedId)
+        }
+
+    @Test
+    fun nonHttpFeedLinksAreSkippedForTheNextValidOne() =
+        runTest {
+            val e =
+                engine(
+                    mapOf(
+                        "https://tidepool.example" to {
+                            respond(
+                                html(
+                                    """<link rel="alternate" type="application/rss+xml" href="feed://t.example/x">""" +
+                                        """<link rel="alternate" type="application/rss+xml" href="/rss">""",
+                                ),
+                                headers = htmlHeaders,
+                            )
+                        },
+                        "https://tidepool.example/rss" to { respond(rss, headers = xmlHeaders) },
+                        "https://onlyfeed.example" to {
+                            respond(
+                                html(
+                                    """<link rel="alternate" type="application/atom+xml" href="feed://onlyfeed.example/atom">""",
+                                ),
+                                headers = htmlHeaders,
+                            )
+                        },
+                    ),
+                )
+            val found = assertIs<DiscoveryResult.Found>(discovery(e).discover("tidepool.example"))
+            assertEquals("https://tidepool.example/rss", found.feedUrl)
+            assertEquals(DiscoveryResult.NoFeed, discovery(e).discover("onlyfeed.example"))
+            assertEquals(
+                listOf("https://tidepool.example", "https://tidepool.example/rss", "https://onlyfeed.example"),
+                e.requestHistory.map { it.url.toString().removeSuffix("/") },
+            )
         }
 
     @Test
