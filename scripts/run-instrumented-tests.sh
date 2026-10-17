@@ -13,6 +13,14 @@
 # app.newz/.MainActivity, waits 10 s, and checks the process is alive with no
 # FATAL EXCEPTION for app.newz in logcat. Exits 0 on a pass. Used by
 # scripts/release-smoke.sh.
+#
+#        bash scripts/run-instrumented-tests.sh --design-capture <out-dir>
+# Instead of the test suite, installs the debug app and test APKs, runs only
+# app.newz.design.DesignCaptureTest with `am instrument` (no Gradle connected
+# task, so the app is not uninstalled before its PNGs are pulled), pulls the
+# app's external files `design-check/*.png` into <out-dir>, then uninstalls
+# both APKs. Exits 0 when every capture test passed and was pulled. Used by
+# scripts/capture-design-screens.sh.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -28,6 +36,15 @@ ADB="$ANDROID_HOME/platform-tools/adb"
 log() { printf '[instrumented] %s\n' "$*"; }
 
 release_smoke=0
+design_capture_dir=""
+if [ "${1:-}" = "--design-capture" ]; then
+  if [ -z "${2:-}" ]; then
+    log "--design-capture needs an output directory"
+    exit 2
+  fi
+  design_capture_dir="$2"
+  shift 2
+fi
 release_apk="$REPO_ROOT/androidApp/build/outputs/apk/release/androidApp-release.apk"
 if [ "${1:-}" = "--release-smoke" ]; then
   release_smoke=1
@@ -127,6 +144,42 @@ run_release_smoke() {
   fi
   log "RELEASE SMOKE PASS: $package alive after 10 s (pid $pid), no FATAL EXCEPTION for $package"
 }
+
+run_design_capture() {
+  local package="app.newz" test_package="app.newz.test" device_dir output pulled
+  device_dir="/sdcard/Android/data/$package/files/design-check"
+  "$ADB" uninstall "$package" > /dev/null 2>&1 || true
+  "$ADB" uninstall "$test_package" > /dev/null 2>&1 || true
+  (cd "$REPO_ROOT" && ./gradlew :androidApp:installDebug :androidApp:installDebugAndroidTest) || return 1
+  log "Running app.newz.design.DesignCaptureTest"
+  output="$("$ADB" shell am instrument -w -e class app.newz.design.DesignCaptureTest \
+    "$test_package/androidx.test.runner.AndroidJUnitRunner" 2>&1 | tr -d '\r')"
+  printf '%s\n' "$output"
+  mkdir -p "$design_capture_dir"
+  if ! "$ADB" pull "$device_dir/." "$design_capture_dir" > /dev/null 2>&1; then
+    # Fallback: read each file as the (debuggable) app itself.
+    for f in $("$ADB" shell run-as "$package" ls "$device_dir" 2> /dev/null | tr -d '\r'); do
+      "$ADB" exec-out run-as "$package" cat "$device_dir/$f" > "$design_capture_dir/$f"
+    done
+  fi
+  "$ADB" uninstall "$test_package" > /dev/null 2>&1 || true
+  "$ADB" uninstall "$package" > /dev/null 2>&1 || true
+  pulled="$(find "$design_capture_dir" -maxdepth 1 -name '*.png' -newer "$emu_log" | wc -l | tr -d ' ')"
+  log "Pulled $pulled PNG(s) into $design_capture_dir"
+  if ! grep -q '^OK (' <<< "$output"; then
+    log "DESIGN CAPTURE FAIL: not every capture test passed"
+    return 1
+  fi
+  [ "$pulled" -gt 0 ]
+}
+
+if [ -n "$design_capture_dir" ]; then
+  set +e
+  run_design_capture
+  capture_status=$?
+  set -e
+  exit "$capture_status"
+fi
 
 if [ "$release_smoke" -eq 1 ]; then
   set +e

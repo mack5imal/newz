@@ -90,6 +90,9 @@ fun newzHttpClient(engine: HttpClientEngine? = null): HttpClient {
         install(HttpTimeout) {
             requestTimeoutMillis = REQUEST_TIMEOUT_MILLIS
             connectTimeoutMillis = CONNECT_TIMEOUT_MILLIS
+            // Without this the engine's own read timeout (OkHttp: 10 s) cuts off a slow feed
+            // before the 15 s request timeout; a feed that answers in 10 s still loads.
+            socketTimeoutMillis = REQUEST_TIMEOUT_MILLIS
         }
     }
     val client = HttpClient(engine ?: platformHttpEngine(), config)

@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
+import app.newz.store.BackupCodec
 import java.io.ByteArrayOutputStream
 import java.io.File
 
@@ -13,7 +14,7 @@ import java.io.File
  */
 object BackupDocuments {
     /** A backup file larger than this is not a valid backup and is not read further. */
-    const val MAX_BYTES: Long = 5L * 1024 * 1024
+    const val MAX_BYTES: Long = BackupCodec.MAX_BYTES
 
     fun write(
         resolver: ContentResolver,

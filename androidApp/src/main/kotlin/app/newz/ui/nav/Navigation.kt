@@ -1,20 +1,13 @@
 package app.newz.ui.nav
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
-import app.newz.ui.components.AppBarSub
-import app.newz.ui.theme.LocalNewzPalette
 
-/** Every full-screen destination. [title] is the app-bar title its placeholder shows. */
+/** Every full-screen destination. [title] is its app-bar title. */
 sealed interface Screen {
     val route: String
     val title: String
@@ -131,21 +124,4 @@ fun NavHost(
 ) {
     BackHandler(enabled = backStack.canPop) { backStack.pop() }
     content(backStack.current)
-}
-
-/** Stands in for a destination whose phase has not landed yet: its app bar and nothing else. */
-@Composable
-fun PlaceholderScreen(
-    screen: Screen,
-    onBack: () -> Unit,
-) {
-    val c = LocalNewzPalette.current
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(c.paper)
-            .testTag(Screen.tagOf(screen)),
-    ) {
-        AppBarSub(title = screen.title, onBack = onBack)
-    }
 }

@@ -5,6 +5,7 @@ import app.newz.store.ArticleIds
 import app.newz.store.ArticleStore
 import app.newz.store.CustomFeed
 import app.newz.store.UserPrefs
+import app.newz.store.characterCount
 import app.newz.store.followTopic
 import app.newz.store.restoreOutlet
 import app.newz.store.restoreTopic
@@ -33,7 +34,7 @@ fun UserPrefs.followCatalogTopic(
 fun normalizeCustomTopic(raw: String): String? =
     raw.trim().takeIf {
         it.isNotEmpty() &&
-            it.length <= MAX_CUSTOM_TOPIC_LENGTH
+            it.characterCount() <= MAX_CUSTOM_TOPIC_LENGTH
     }
 
 /**

@@ -20,6 +20,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import app.newz.store.MAX_KEYWORD_LENGTH
+import app.newz.store.characterCount
 import app.newz.store.normalizeKeyword
 import app.newz.ui.components.BottomSheet
 import app.newz.ui.components.Button
@@ -168,7 +169,7 @@ fun keywordSuggestions(
     endRun()
     return runs
         .flatMap { words -> if (words.size <= MAX_RUN_WORDS) listOf(words.joinToString(" ")) else words }
-        .filter { it.length <= MAX_KEYWORD_LENGTH }
+        .filter { it.characterCount() <= MAX_KEYWORD_LENGTH }
         .distinctBy { it.lowercase() }
         .take(max)
 }
@@ -193,7 +194,7 @@ fun KeywordMuteSheet(
     val suggestions = remember(headline) { keywordSuggestions(headline) }
     var text by rememberSaveable { mutableStateOf("") }
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
-    val tooLong = text.length > MAX_KEYWORD_LENGTH
+    val tooLong = text.characterCount() > MAX_KEYWORD_LENGTH
     val keyword = normalizeKeyword(text)?.takeUnless { tooLong }
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -254,7 +255,7 @@ fun KeywordMuteSheet(
                 helper = "Matches the whole word, in any capitalization",
                 error = if (tooLong) "Keep it to 60 characters or fewer" else null,
                 maxLength = MAX_KEYWORD_LENGTH,
-                counter = "${text.length}/60",
+                counter = "${text.characterCount()}/60",
                 fieldModifier = Modifier.focusRequester(focus),
                 modifier = Modifier.padding(top = NewzTokens.spaceL + NewzTokens.spaceXs),
             )

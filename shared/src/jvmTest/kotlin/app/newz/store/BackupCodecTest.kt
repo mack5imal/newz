@@ -156,6 +156,10 @@ class BackupCodecTest {
                     good.replace("\"newz-backup\"", "\"other-app\"") to BackupError.WrongFormat::class,
                     good.replace("\"version\": 1", "\"version\": 99") to BackupError.UnsupportedVersion::class,
                     good.replace("\"zip\": \"02134\"", "\"zip\": [1]") to BackupError.Malformed::class,
+                    good.dropLast(20) to BackupError.Malformed::class,
+                    good.replace("\"saved\"", "\"unsaved\"") to BackupError.Malformed::class,
+                    "" to BackupError.Malformed::class,
+                    (" ".repeat(BackupCodec.MAX_BYTES.toInt()) + good) to BackupError.Malformed::class,
                 )
             for ((text, error) in cases) {
                 val result = BackupCodec.import(text)

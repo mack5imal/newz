@@ -1,6 +1,7 @@
 package app.newz.feed
 
 import app.newz.net.HostGuard
+import app.newz.net.WebUrl
 import com.prof18.rssparser.RssParser
 import com.prof18.rssparser.model.RssItem
 import kotlin.time.Instant
@@ -31,11 +32,15 @@ class FeedParseException(
 
 /** Decodes and parses RSS 2.0, Atom and RDF (RSS 1.0) feeds into [ParsedFeed]. */
 object FeedParser {
+    /** A feed with thousands of items is cut to its newest [MAX_ITEMS] (the feed only shows 7 days). */
+    const val MAX_ITEMS = 300
+
     private val PROLOG = Regex("^\\s*<\\?xml[^>]*\\?>")
     private val PROLOG_ENCODING = Regex("^\\s*<\\?xml[^>]*encoding\\s*=\\s*[\"']([A-Za-z0-9._:-]+)[\"']")
 
     // DOCTYPEs are removed so the platform XML parser never resolves an external entity (no XXE).
     private val DOCTYPE = Regex("<!DOCTYPE[^\\[>]*(\\[[\\s\\S]*?])?\\s*>", RegexOption.IGNORE_CASE)
+    private val DECLARATION = Regex("<!(DOCTYPE|ENTITY)", RegexOption.IGNORE_CASE)
     private val ROOT = Regex("<([A-Za-z_][\\w.-]*:)?(rss|feed|RDF)\\b")
     private val IMG_SRC =
         Regex("<img\\b[^>]*?\\bsrc\\s*=\\s*(\"([^\"]*)\"|'([^']*)'|([^\\s>]+))", RegexOption.IGNORE_CASE)
@@ -49,6 +54,9 @@ object FeedParser {
         contentTypeCharset: String?,
     ): ParsedFeed {
         val xml = prepareXml(decode(bytes, contentTypeCharset))
+        // A DOCTYPE the pattern could not remove whole leaves a declaration behind: refuse the feed
+        // rather than let any parser see an entity definition (no XXE, no entity expansion).
+        if (DECLARATION.containsMatchIn(xml)) throw FeedParseException("Feed declares a DTD or entities")
         val kind = detectKind(xml) ?: throw FeedParseException("Not an RSS, Atom or RDF document")
         val channel =
             try {
@@ -60,8 +68,22 @@ object FeedParser {
             title = HtmlText.toPlainText(channel.title.orEmpty()),
             siteUrl = channel.link?.trim()?.ifEmpty { null },
             kind = kind,
-            items = channel.items.mapNotNull(::toItem),
+            items = newest(channel.items.mapNotNull(::toItem)),
         )
+    }
+
+    /** At most [MAX_ITEMS] items per feed: the newest ones (undated count as oldest), in feed order. */
+    internal fun newest(items: List<ParsedItem>): List<ParsedItem> {
+        if (items.size <= MAX_ITEMS) return items
+        val keep =
+            items.indices
+                .sortedWith(
+                    compareByDescending<Int> { items[it].publishedAt != null }
+                        .thenByDescending { items[it].publishedAt }
+                        .thenBy { it },
+                ).take(MAX_ITEMS)
+                .toSet()
+        return items.filterIndexed { i, _ -> i in keep }
     }
 
     internal fun decode(
@@ -91,7 +113,8 @@ object FeedParser {
         }
 
     private fun toItem(item: RssItem): ParsedItem? {
-        val url = item.link?.trim()?.ifEmpty { null } ?: return null
+        // Only http(s) links are kept: a `javascript:`, `intent:` or `file:` link is never stored.
+        val url = item.link?.trim()?.takeIf(WebUrl::isWebUrl) ?: return null
         val title = HtmlText.toPlainText(item.title.orEmpty())
         if (title.isEmpty()) return null
         val body = item.description ?: item.content

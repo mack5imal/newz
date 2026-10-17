@@ -29,6 +29,20 @@ class PrefsOpsTest {
     }
 
     @Test
+    fun unicodeKeywordsAreCountedInCharactersNotUtf16Units() {
+        // Accented, CJK and right-to-left letters are one UTF-16 unit each; emoji are two.
+        for (unit in listOf("é", "東", "ש", "😀")) {
+            val sixty = unit.repeat(60)
+            assertEquals(60, sixty.characterCount())
+            assertEquals(sixty, normalizeKeyword(sixty), "60 × $unit")
+            assertNull(normalizeKeyword(unit.repeat(61)), "61 × $unit")
+        }
+        assertEquals(listOf("Zürich 😀"), UserPrefs().muteKeyword("Zürich 😀", t0).mutedKeywords.map { it.text })
+        // A lone surrogate still counts as one character.
+        assertEquals(2, "a\uD800".characterCount())
+    }
+
+    @Test
     fun mutingIsCaseInsensitiveUnique() {
         val p = UserPrefs().muteKeyword("Trump", t0).muteKeyword("trump", t1)
         assertEquals(listOf(MutedKeyword("Trump", t0)), p.mutedKeywords)

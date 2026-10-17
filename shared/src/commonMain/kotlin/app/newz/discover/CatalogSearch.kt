@@ -5,6 +5,7 @@ import app.newz.catalog.Outlet
 import app.newz.catalog.Topic
 import app.newz.filter.KeywordMatcher
 import app.newz.store.UserPrefs
+import app.newz.store.characterCount
 
 /** The longest custom topic, in characters after trimming. */
 const val MAX_CUSTOM_TOPIC_LENGTH = 60
@@ -84,7 +85,7 @@ object CatalogSearch {
                     )
                 }
         val isTopicName = catalog.topics.any { fold(it.name) == needle }
-        val offer = text.takeIf { it.length <= MAX_CUSTOM_TOPIC_LENGTH && !isTopicName }
+        val offer = text.takeIf { it.characterCount() <= MAX_CUSTOM_TOPIC_LENGTH && !isTopicName }
         return SearchResults(outlets, topics, offer)
     }
 

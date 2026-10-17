@@ -7,8 +7,23 @@ const val MAX_KEYWORD_LENGTH = 60
 
 private val ZIP = Regex("\\d{5}")
 
-/** Returns [raw] trimmed when it is a valid muted keyword (1..60 chars, not blank), else null. */
-fun normalizeKeyword(raw: String): String? = raw.trim().takeIf { it.isNotEmpty() && it.length <= MAX_KEYWORD_LENGTH }
+/**
+ * Characters as a person counts them: Unicode code points, so an emoji or other character outside
+ * the Basic Multilingual Plane (two UTF-16 units) counts once.
+ */
+fun String.characterCount(): Int {
+    var count = 0
+    var i = 0
+    while (i < length) {
+        i += if (this[i].isHighSurrogate() && i + 1 < length && this[i + 1].isLowSurrogate()) 2 else 1
+        count++
+    }
+    return count
+}
+
+/** Returns [raw] trimmed when it is a valid muted keyword (1..60 characters, not blank), else null. */
+fun normalizeKeyword(raw: String): String? =
+    raw.trim().takeIf { it.isNotEmpty() && it.characterCount() <= MAX_KEYWORD_LENGTH }
 
 /**
  * Mutes [raw]. Throws [IllegalArgumentException] when [normalizeKeyword] rejects it; check with

@@ -68,6 +68,9 @@ object BackupCodec {
     const val FORMAT = "newz-backup"
     const val VERSION = 1
 
+    /** The largest backup read, in bytes (the file pickers enforce it too). */
+    const val MAX_BYTES: Long = 5L * 1024 * 1024
+
     @Serializable
     private data class BackupFile(
         val format: String,
@@ -111,6 +114,8 @@ object BackupCodec {
 
     /** Reads a backup. Fails with a [BackupError]; nothing is changed by reading. */
     fun import(text: String): Result<BackupContents> {
+        // Every UTF-8 character is at least one byte, so more characters than MAX_BYTES is too big.
+        if (text.length > MAX_BYTES) return Result.failure(BackupError.Malformed())
         val root =
             try {
                 json.parseToJsonElement(text) as? JsonObject

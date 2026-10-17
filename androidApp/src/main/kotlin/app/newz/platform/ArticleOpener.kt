@@ -7,13 +7,15 @@ import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.net.toUri
+import app.newz.net.WebUrl
 import app.newz.ui.theme.NewzColors
 
 /**
  * Opens an article in the user's default browser (SPEC S20): a Custom Tab when that browser
  * provides one, otherwise a plain VIEW intent. No package is ever set, no session is bound and
  * nothing is warmed up or prefetched, so Android resolves the default browser and Newz never
- * names one. The URL is passed exactly as the feed gave it.
+ * names one. The URL is passed exactly as the feed gave it, and only an http(s) URL is opened
+ * (never `javascript:`, `intent:` or `file:`).
  *
  * [customTabsProvider] answers whether the default browser offers Custom Tabs (the production
  * graph asks `CustomTabsClient.getPackageName` with an empty package list); tests inject it.
@@ -21,11 +23,12 @@ import app.newz.ui.theme.NewzColors
 class ArticleOpener(
     private val customTabsProvider: () -> String?,
 ) {
-    /** Returns false when no app on the device can open [url]. */
+    /** Returns false when [url] is not an http(s) link or no app on the device can open it. */
     fun open(
         context: Context,
         url: String,
     ): Boolean {
+        if (!WebUrl.isWebUrl(url)) return false
         val uri = url.toUri()
         return try {
             if (customTabsProvider() != null) {

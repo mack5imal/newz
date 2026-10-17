@@ -40,3 +40,11 @@
 # --- RSS-Parser uses XmlPullParser from the platform ---
 -dontwarn org.xmlpull.v1.**
 -keep class org.xmlpull.v1.** { *; }
+
+# --- Release logging: debug, verbose and info logs are removed, so no article URL or zip code
+# can reach logcat from a release build (the app makes no such calls today; this keeps it so). ---
+-assumenosideeffects class android.util.Log {
+    public static int d(...);
+    public static int v(...);
+    public static int i(...);
+}

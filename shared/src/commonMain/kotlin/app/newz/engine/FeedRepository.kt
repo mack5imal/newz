@@ -76,6 +76,9 @@ class FeedRepository(
     pageSize: Int = FeedPager.DEFAULT_PAGE_SIZE,
 ) {
     private val state = MutableStateFlow<FeedState>(FeedState.Loading(firstLoad = true))
+
+    /** True while a load that began with no cards shown is still landing feeds. */
+    private var growing = false
     private val lock = Mutex()
     private val pager = FeedPager(pageSize)
     private var selectedTopics: Set<String> = emptySet()
@@ -172,14 +175,21 @@ class FeedRepository(
     private suspend fun onProgress(progress: FetchProgress) {
         if (progress is FetchProgress.Offline) offline = true
         val landed = progress is FetchProgress.FeedDone && progress.outcome is FeedOutcome.Ok
-        if (landed && state.value !is FeedState.Content) {
+        if (!landed) return
+        if (state.value !is FeedState.Content) {
             offline = false
+            growing = true
+            publish(readSnapshot(), reset = true, loading = true)
+        } else if (growing) {
+            // A load that started with nothing on screen re-ranks as each feed lands, so one
+            // slow feed never holds back the others. Loads over shown cards merge once, at the end.
             publish(readSnapshot(), reset = true, loading = true)
         }
     }
 
     private suspend fun onLoaded(result: LoadResult) {
         loadedOnce = true
+        growing = false
         offline = result.offline
         failing = result.failingFeeds
         publish(result.snapshot, reset = state.value !is FeedState.Content, loading = false)

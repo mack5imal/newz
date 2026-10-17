@@ -20,7 +20,6 @@ import app.newz.store.UserPrefs
 import app.newz.ui.feed.FeedScreen
 import app.newz.ui.feed.FeedViewModel
 import app.newz.ui.nav.NavHost
-import app.newz.ui.nav.PlaceholderScreen
 import app.newz.ui.nav.Screen
 import app.newz.ui.nav.rememberBackStack
 import app.newz.ui.onboarding.OnboardingScreen
@@ -137,10 +136,6 @@ private fun NewzNavigation(
 
             Screen.About -> {
                 AboutScreen(onBack = backStack::pop)
-            }
-
-            else -> {
-                PlaceholderScreen(screen, onBack = backStack::pop)
             }
         }
     }
