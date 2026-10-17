@@ -124,6 +124,14 @@ class StoryGrouperTest {
         assertEquals(1.0, terms.getValue("rais"))
     }
 
+    @Test
+    fun decomposedAndComposedAccentsGiveTheSameTerms() {
+        val nfd = "Pokémon fans"
+        val nfc = "Pokémon fans"
+        assertEquals(TextFeatures.terms(nfc, null), TextFeatures.terms(nfd, null))
+        assertTrue("pokemon" in TextFeatures.terms(nfd, null).keys)
+    }
+
     private fun noAffinity(outletId: String): Double = 0.0
 
     private fun together(

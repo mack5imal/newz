@@ -39,12 +39,16 @@ object TextFeatures {
         }
     }
 
-    /** Words of [text] with their original case: runs of letters and digits, apostrophes inside. */
+    /**
+     * Words of [text] with their original case: runs of letters and digits, apostrophes and
+     * combining accent marks (U+0300..U+036F, as in NFD text) inside, so NFD and NFC agree.
+     */
     internal fun rawWords(text: String): List<String> {
         val result = mutableListOf<String>()
         val current = StringBuilder()
         for (c in text) {
-            if (c.isLetterOrDigit() || (c in APOSTROPHES && current.isNotEmpty())) {
+            val inside = current.isNotEmpty() && (c in APOSTROPHES || c in '̀'..'ͯ')
+            if (c.isLetterOrDigit() || inside) {
                 current.append(c)
             } else if (current.isNotEmpty()) {
                 result += current.toString()
