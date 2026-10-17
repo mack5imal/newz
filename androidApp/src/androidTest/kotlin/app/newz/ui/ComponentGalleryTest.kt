@@ -91,6 +91,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.math.abs
 
 @RunWith(AndroidJUnit4::class)
 class ComponentGalleryTest {
@@ -323,6 +324,15 @@ class ComponentGalleryTest {
             .onAllNodes(hasAnyAncestor(hasTestTag(NO_IMAGE_TAG)) and hasTextLayout(), useUnmergedTree = true)
             .assertCountEquals(2 * "WORLD".length)
         composeRule.onAllNodes(hasAnyAncestor(hasTestTag(NO_IMAGE_TAG)) and hasTextLayout()).assertCountEquals(0)
+        // The tiles sit centred across the panel (B14).
+        val letters = lettersIn(NO_IMAGE_TAG)
+        assertEquals("WORLD", letters.joinToString("") { it.text })
+        val tilesCentre = (letters.first().left + letters.last().right) / 2f
+        val slack = with(composeRule.density) { 4.dp.toPx() }
+        assertTrue(
+            "tiles centred at $tilesCentre, panel at ${panel.boundsInRoot.center.x}",
+            abs(tilesCentre - panel.boundsInRoot.center.x) <= slack,
+        )
     }
 
     @Composable

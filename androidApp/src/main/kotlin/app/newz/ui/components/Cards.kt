@@ -259,8 +259,8 @@ internal fun TopicTiles(
 
 /**
  * `NoImagePanel` — replaces [ArticleImage] when there is no picture (none in the feed, or it
- * failed to load): a 104 dp `strip` panel with the first [topic] spelled in [FlapTile]s, 12 from
- * the left and centred top to bottom. A word too long for full-size tiles uses small ones and is
+ * failed to load): a 104 dp `strip` panel with the first [topic] spelled in [FlapTile]s, centred
+ * across (at least 12 from each side) and top to bottom. A word too long for full-size tiles uses small ones and is
  * cut at a whole letter if still too long. The tiles keep their size at every text size.
  * Decorative: hidden from screen readers.
  */
@@ -278,7 +278,7 @@ fun NoImagePanel(
                 .height(NewzTokens.noImageHeight)
                 .background(c.strip)
                 .padding(horizontal = NewzTokens.spaceM),
-        contentAlignment = Alignment.CenterStart,
+        contentAlignment = Alignment.Center,
     ) {
         TopicTiles(topic = topic, modifier = Modifier.clearAndSetSemantics { })
     }
