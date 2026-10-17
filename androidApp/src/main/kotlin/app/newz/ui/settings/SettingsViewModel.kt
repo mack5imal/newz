@@ -154,7 +154,8 @@ class SettingsViewModel(
 
     /**
      * The followed outlets: failing ones pinned first, then in follow order. Local feeds follow
-     * through the zip (Topics), so an outlet with only local feeds is not listed here.
+     * through the zip (Topics), so an outlet with only local feeds is listed here only while one
+     * of its feeds is not loading (SPEC S25).
      */
     fun sources(
         p: UserPrefs,
@@ -190,7 +191,37 @@ class SettingsViewModel(
                         address = feed.siteUrl ?: feed.url,
                     )
                 }
-        return (fromCatalog + custom).sortedBy { it.failingSince == null }
+        val localFailing =
+            p.localMetroId
+                ?.takeIf { Catalog.LOCAL_TOPIC in p.followedTopics }
+                ?.let(catalog::localFeeds)
+                .orEmpty()
+                .filter { it.outletId !in p.removedOutlets && it.id in counts.failingFeeds }
+                .groupBy({ it.outletId }, { it.id })
+        val listed =
+            fromCatalog.map { item ->
+                val extra = localFailing[item.outletId] ?: return@map item
+                val failing = item.failingFeedIds + extra
+                item.copy(
+                    failingSince = failing.mapNotNull { counts.failingFeeds[it] }.minOrNull(),
+                    failingFeedIds = failing,
+                )
+            }
+        val listedIds = fromCatalog.map { it.outletId }.toSet()
+        val local =
+            localFailing
+                .filterKeys { it !in listedIds }
+                .map { (outletId, failing) ->
+                    SourceItem(
+                        outletId = outletId,
+                        name = outletName(outletId),
+                        sections = emptyList(),
+                        paywall = catalog.outlet(outletId)?.paywall ?: PaywallStatus.NONE,
+                        failingSince = failing.mapNotNull { counts.failingFeeds[it] }.minOrNull(),
+                        failingFeedIds = failing,
+                    )
+                }
+        return (listed + local + custom).sortedBy { it.failingSince == null }
     }
 
     fun paywallFlagged(p: UserPrefs): List<DatedOutlet> =
@@ -208,7 +239,13 @@ class SettingsViewModel(
         )
     }
 
-    fun restoreOutlet(outletId: String) = update { it.restoreOutlet(outletId) }
+    /** Restore: the outlet's feeds are fetched again, since a removed outlet's cache may be pruned. */
+    fun restoreOutlet(outletId: String) {
+        viewModelScope.launch {
+            graph.preferencesStore.update { it.restoreOutlet(outletId) }
+            graph.feedRepository.refresh()
+        }
+    }
 
     fun unflagPaywall(outletId: String) = update { it.unflagPaywall(outletId) }
 
