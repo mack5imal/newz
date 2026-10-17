@@ -26,6 +26,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import app.newz.catalog.Catalog
 import app.newz.store.Level
+import app.newz.store.caption
+import app.newz.store.label
 import app.newz.ui.components.Button
 import app.newz.ui.components.ButtonVariant
 import app.newz.ui.components.IconButton
@@ -44,21 +46,25 @@ import app.newz.ui.theme.NewzTokens
 private const val TOPICS_PREVIEW = 3
 
 private val LEVELS = listOf(Level.NORMAL, Level.MORE, Level.MUCH_MORE)
-private val LEVEL_LABELS = listOf("Normal", "More", "Much more")
+private val LEVEL_LABELS = LEVELS.map { it.label }
 
 /** Test tags on the Topics rows. */
 object TopicsSemantics {
-    /** The row of a followed or keyword topic, `topic:<id>`. */
+    /** The row of a followed, keyword, boosted or muted topic, `topic:<id>`. */
     fun row(topicId: String): String = "topic:$topicId"
+
+    /** The "Other topics you’ve boosted" panel. */
+    const val BOOSTED_PANEL = "topics:boosted"
 }
 
 // Screen marker for `settings-topics` sits with the settings family in SettingsScreen.kt.
 
 /**
  * Topics & keywords (design `settings-topics`): Followed topics (× Unfollow with Undo, the level
- * control, the Much-more note, "Show all {n}" after three; Local shows its zip and metro and opens
- * the zip sheet), Your keyword topics, Muted topics (Restore) and Muted keywords (chips that
- * unmute on tap, or a hint when there are none).
+ * control with a caption saying what the level means, the Much-more note, "Show all {n}" after
+ * three; Local shows its zip and metro and opens the zip sheet), Your keyword topics, Other topics
+ * you’ve boosted (unfollowed topics above Normal, only when there are any; Normal drops one with
+ * Undo), Muted topics (Restore) and Muted keywords (chips that unmute on tap, or a hint).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -81,7 +87,8 @@ fun TopicsScreen(
                     topic = topic,
                     removeLabel = "Unfollow ${topic.name}",
                     showDivider = index > 0,
-                    viewModel = viewModel,
+                    onRemove = { viewModel.unfollow(topic.id) },
+                    onLevel = { viewModel.setLevel(topic.id, it) },
                     onClick = if (local) ({ editZip = true }) else null,
                     extra =
                         if (local && p.zip != null) {
@@ -110,7 +117,26 @@ fun TopicsScreen(
                         topic = topic,
                         removeLabel = "Remove ${topic.name}",
                         showDivider = index > 0,
-                        viewModel = viewModel,
+                        onRemove = { viewModel.unfollow(topic.id) },
+                        onLevel = { viewModel.setLevel(topic.id, it) },
+                    )
+                }
+            }
+        }
+        val boosted = viewModel.boostedTopics(p)
+        if (boosted.isNotEmpty()) {
+            Panel(
+                title = "Other topics you’ve boosted",
+                count = "${boosted.size}",
+                modifier = Modifier.testTag(TopicsSemantics.BOOSTED_PANEL),
+            ) {
+                Hint("Topics you raised from an article’s ⋮ menu but don’t follow. Set Normal to drop one.")
+                boosted.forEach { topic ->
+                    TopicRow(
+                        topic = topic,
+                        removeLabel = null,
+                        showDivider = true,
+                        onLevel = { viewModel.setBoostedLevel(topic.id, it) },
                     )
                 }
             }
@@ -168,15 +194,17 @@ fun TopicsScreen(
 }
 
 /**
- * A followed or keyword topic: its name (and [TopicItem.subtitle]), an × [IconButton] spoken
- * [removeLabel], and the Normal / More / Much more control, with the note at Much more.
+ * A followed, keyword or boosted topic: its name (and [TopicItem.subtitle]), an × [IconButton]
+ * spoken [removeLabel] (none when null), and the Normal / More / Much more control with a caption
+ * saying what the selected level means, then the note at Much more.
  */
 @Composable
 private fun TopicRow(
     topic: TopicItem,
-    removeLabel: String,
+    removeLabel: String?,
     showDivider: Boolean,
-    viewModel: SettingsViewModel,
+    onLevel: (Level) -> Unit,
+    onRemove: () -> Unit = {},
     onClick: (() -> Unit)? = null,
     extra: (@Composable () -> Unit)? = null,
 ) {
@@ -202,16 +230,20 @@ private fun TopicRow(
                 topic.subtitle?.let { PlainText(text = it, style = NewzTokens.typeRowSub, color = c.inkMuted) }
             }
             extra?.invoke()
-            IconButton(
-                icon = NewzIcons.iconClose,
-                contentDescription = removeLabel,
-                onClick = { viewModel.unfollow(topic.id) },
-            )
+            if (removeLabel != null) {
+                IconButton(icon = NewzIcons.iconClose, contentDescription = removeLabel, onClick = onRemove)
+            }
         }
         SegmentedControl(
             options = LEVEL_LABELS,
             selectedIndex = LEVELS.indexOf(topic.level),
-            onSelect = { viewModel.setLevel(topic.id, LEVELS[it]) },
+            onSelect = { onLevel(LEVELS[it]) },
+            modifier = Modifier.padding(start = NewzTokens.spaceL, end = NewzTokens.spaceL, top = NewzTokens.spaceS),
+        )
+        PlainText(
+            text = topic.level.caption(topic.name),
+            style = NewzTokens.typeRowSub,
+            color = c.inkMuted,
             modifier = Modifier.padding(start = NewzTokens.spaceL, end = NewzTokens.spaceL, top = NewzTokens.spaceS),
         )
         if (topic.level == Level.MUCH_MORE) {

@@ -4,6 +4,8 @@ import app.newz.dedup.StoryGroup
 import app.newz.feed.Article
 import app.newz.store.Level
 import app.newz.store.UserPrefs
+import app.newz.store.meaning
+import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -71,6 +73,18 @@ class FeedRankerTest {
     fun muchMoreTopicGetsAboutThreeTimesTheCardsOfANormalTopic() {
         val ratio = boostRatio(Level.MUCH_MORE)
         assertTrue(ratio in 2.6..3.4, "Much more ratio $ratio")
+    }
+
+    /** The level wording ("about 2× as often") names the ranker's weight, and the ranker delivers it. */
+    @Test
+    fun levelMeaningMatchesTheRankerWeight() {
+        assertEquals(1, FeedRanker.weight(Level.NORMAL))
+        for (level in listOf(Level.MORE, Level.MUCH_MORE)) {
+            val weight = FeedRanker.weight(level)
+            assertEquals("about $weight× as often", level.meaning)
+            val ratio = boostRatio(level)
+            assertTrue(abs(ratio - weight) <= 0.35, "$level ratio $ratio for weight $weight")
+        }
     }
 
     @Test

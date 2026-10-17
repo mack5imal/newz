@@ -241,28 +241,53 @@ class CardActionsTest {
     }
 
     @Test
-    fun showMoreRaisesTheTopicAndIsDisabledAtMuchMore() {
+    fun showMoreAndShowLessStepTheTopicWithItsLevelNamedAndUndo() {
         server.fill(itemsPerFeed = 3)
         start()
         val target = compose.servedCards().first { it.topics.firstOrNull() == TestCatalog.SCIENCE }
         assertEquals(Level.NORMAL, currentPrefs().levelOf(TestCatalog.SCIENCE))
 
+        // At Normal: Show more only, no level note.
+        compose.openCardMenu(titleOf(target))
+        assertTrue(compose.onAllNodesWithText("Show less like this").fetchSemanticsNodes().isEmpty())
+        assertTrue(compose.onAllNodesWithText("You’re seeing more", substring = true).fetchSemanticsNodes().isEmpty())
+        compose.tapText("Show more like this")
+        compose.waitUntil(TIMEOUT) { currentPrefs().levelOf(TestCatalog.SCIENCE) == Level.MORE }
+        compose.onNodeWithText(MESSAGE_MORE).assertIsDisplayed()
+        compose.tapText("Undo")
+        compose.waitUntil(TIMEOUT) { TestCatalog.SCIENCE !in currentPrefs().topicLevels }
+
         compose.openCardMenu(titleOf(target))
         compose.tapText("Show more like this")
         compose.waitUntil(TIMEOUT) { currentPrefs().levelOf(TestCatalog.SCIENCE) == Level.MORE }
-        compose.onNodeWithText("Showing more like this").assertIsDisplayed()
-        compose.onNodeWithText("Undo").assertIsDisplayed()
+        waitUntilNoUndo()
+
+        // Above Normal: the note names the level and what it means, and Show less steps down.
+        compose.openCardMenu(titleOf(target))
+        compose.onNodeWithText("You’re seeing more Science — More (about 2× as often)").assertIsDisplayed()
+        compose.tapText("Show less like this")
+        compose.waitUntil(TIMEOUT) { TestCatalog.SCIENCE !in currentPrefs().topicLevels }
+        compose.onNodeWithText(MESSAGE_NORMAL).assertIsDisplayed()
+        compose.tapText("Undo")
+        compose.waitUntil(TIMEOUT) { currentPrefs().levelOf(TestCatalog.SCIENCE) == Level.MORE }
 
         val prefs = currentPrefs()
         TestPrefs.write(prefs.copy(topicLevels = prefs.topicLevels + (TestCatalog.SCIENCE to Level.MUCH_MORE)))
-        compose.waitUntil(
-            TIMEOUT,
-        ) { compose.onAllNodesWithText("Showing more like this").fetchSemanticsNodes().isEmpty() }
+        waitUntilNoUndo()
         compose.openCardMenu(titleOf(target))
+        compose.onNodeWithText("You’re seeing more Science — Much more (about 3× as often)").assertIsDisplayed()
         compose.onNodeWithText("Show more like this").assertIsNotEnabled()
         compose.onNodeWithText("Already showing much more of Science").assertIsDisplayed()
         compose.onNodeWithText("Show more like this").performClick()
         assertEquals(Level.MUCH_MORE, currentPrefs().levelOf(TestCatalog.SCIENCE))
+        compose.tapText("Show less like this")
+        compose.waitUntil(TIMEOUT) { currentPrefs().levelOf(TestCatalog.SCIENCE) == Level.MORE }
+        compose.onNodeWithText(MESSAGE_MORE).assertIsDisplayed()
+    }
+
+    /** The Undo snackbar sits over the bottom of the list; let it time out before opening a menu. */
+    private fun waitUntilNoUndo() {
+        compose.waitUntil(TIMEOUT) { compose.onAllNodesWithText("Undo").fetchSemanticsNodes().isEmpty() }
     }
 
     @Test
@@ -327,5 +352,7 @@ class CardActionsTest {
         const val TIMEOUT = 10_000L
         const val CAUGHT_UP = "You're all caught up"
         const val ALL_FILTERED = "Nothing to show — your filters hide everything"
+        const val MESSAGE_MORE = "Science now at More (about 2× as often). Change it in Settings."
+        const val MESSAGE_NORMAL = "Science now at Normal (the usual share). Change it in Settings."
     }
 }

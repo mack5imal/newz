@@ -245,6 +245,7 @@ fun FeedScreen(
                         onToggleSaved = { viewModel.toggleSaved(card) },
                         onHide = { viewModel.hide(card) },
                         onShowMore = { viewModel.showMore(article) },
+                        onShowLess = { viewModel.showLess(article) },
                         onRemoveOutlet = { viewModel.removeOutlet(article) },
                         onMuteTopic = viewModel::muteTopic,
                         onMuteKeyword = { muteHeadline = article.title },

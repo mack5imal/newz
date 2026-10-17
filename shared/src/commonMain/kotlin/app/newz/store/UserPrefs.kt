@@ -6,8 +6,41 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import kotlin.time.Instant
 
-/** How much of a followed topic the feed shows. */
+/** How much of a topic the feed shows. */
 enum class Level { NORMAL, MORE, MUCH_MORE }
+
+/** The level's short name, as the Topics control shows it: "Normal", "More", "Much more". */
+val Level.label: String
+    get() =
+        when (this) {
+            Level.NORMAL -> "Normal"
+            Level.MORE -> "More"
+            Level.MUCH_MORE -> "Much more"
+        }
+
+/**
+ * What the level does, in the ranker's terms ([app.newz.engine.FeedRanker.weight] 1, 2, 3): a
+ * More topic comes up about twice as often as a Normal one, a Much more topic about three times,
+ * while it has articles to show. Ranking only orders the feed, so "as often", not "as many".
+ */
+val Level.meaning: String
+    get() =
+        when (this) {
+            Level.NORMAL -> "the usual share"
+            Level.MORE -> "about 2× as often"
+            Level.MUCH_MORE -> "about 3× as often"
+        }
+
+/** The name with its meaning, wherever a level is named in a sentence: "More (about 2× as often)". */
+val Level.labelWithMeaning: String get() = "$label ($meaning)"
+
+/** The caption under a topic's level control, e.g. "Science comes up about 2× as often as a Normal topic." */
+fun Level.caption(topic: String): String =
+    if (this == Level.NORMAL) {
+        "$topic gets the usual share of your feed."
+    } else {
+        "$topic comes up $meaning as a Normal topic."
+    }
 
 /** Article text size. */
 enum class TextSize { SMALL, DEFAULT, LARGE, EXTRA_LARGE }

@@ -15,6 +15,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import app.newz.engine.FeedCard
+import app.newz.store.Level
+import app.newz.store.labelWithMeaning
 import app.newz.ui.components.BottomSheet
 import app.newz.ui.components.PlainText
 import app.newz.ui.components.SheetActionRow
@@ -28,6 +30,7 @@ data class CardMenuActions(
     val onToggleSaved: () -> Unit,
     val onHide: () -> Unit,
     val onShowMore: () -> Unit,
+    val onShowLess: () -> Unit,
     val onRemoveOutlet: () -> Unit,
     val onMuteTopic: (topicId: String) -> Unit,
     val onMuteKeyword: () -> Unit,
@@ -40,9 +43,10 @@ data class CardMenuActions(
  * Article actions (design `card-menu`): a `BottomSheet` with the "{outlet} · {age}" meta line
  * and the full headline, then the `SheetActionRow`s in the design's order: Save for later (or
  * Unsave with the filled bookmark), Hide this article, Show more like this (disabled with
- * "Already showing much more of {topic}" at Much more, SPEC S10), a divider, Don't show content
- * from {outlet}, one Don't show {topic} per article topic, Mute a keyword…, and Mark {outlet} as
- * paywalled (left out once the outlet is flagged). Choosing a row calls [onDismiss] first.
+ * "Already showing much more of {topic}" at Much more, SPEC S10) and, when the topic is above
+ * Normal, a note naming its level with what it means and Show less like this; a divider, Don't
+ * show content from {outlet}, one Don't show {topic} per article topic, Mute a keyword…, and Mark
+ * {outlet} as paywalled (left out once the outlet is flagged). Choosing a row calls [onDismiss] first.
  */
 @Composable
 fun CardMenuSheet(
@@ -111,21 +115,36 @@ fun CardMenuSheet(
                     onClick = choose(actions.onHide),
                 )
                 if (primary != null) {
-                    val atMax = viewModel.isAtMuchMore(primary)
+                    val level = viewModel.levelOf(primary)
+                    val topic = viewModel.topicName(primary)
+                    val atMax = level == Level.MUCH_MORE
+                    if (level != Level.NORMAL) {
+                        PlainText(
+                            text = "You’re seeing more $topic — ${level.labelWithMeaning}",
+                            style = NewzTokens.typeRowSub,
+                            color = c.inkMuted,
+                            modifier =
+                                Modifier.padding(
+                                    start = NewzTokens.spaceXl,
+                                    top = NewzTokens.spaceS,
+                                    end = NewzTokens.spaceXl,
+                                ),
+                        )
+                    }
                     SheetActionRow(
                         label = "Show more like this",
                         icon = NewzIcons.iconArrowUp,
                         onClick = choose(actions.onShowMore),
                         enabled = !atMax,
-                        explanation =
-                            if (atMax) {
-                                "Already showing much more of ${viewModel.topicName(
-                                    primary,
-                                )}"
-                            } else {
-                                null
-                            },
+                        explanation = if (atMax) "Already showing much more of $topic" else null,
                     )
+                    if (level != Level.NORMAL) {
+                        SheetActionRow(
+                            label = "Show less like this",
+                            icon = NewzIcons.iconArrowDown,
+                            onClick = choose(actions.onShowLess),
+                        )
+                    }
                 }
                 Box(
                     Modifier

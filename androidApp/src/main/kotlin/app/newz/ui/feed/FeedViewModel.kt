@@ -14,7 +14,9 @@ import app.newz.filter.topicDisplayName
 import app.newz.store.Level
 import app.newz.store.UserPrefs
 import app.newz.store.flagPaywall
+import app.newz.store.labelWithMeaning
 import app.newz.store.levelOf
+import app.newz.store.lowerLevel
 import app.newz.store.muteKeyword
 import app.newz.store.muteTopic
 import app.newz.store.raiseLevel
@@ -217,14 +219,27 @@ class FeedViewModel(
     }
 
     /** Raises [article]'s primary topic one level (Normal, More, Much more). */
-    fun showMore(article: Article) {
+    fun showMore(article: Article) = changeLevel(article) { raiseLevel(it) }
+
+    /** Lowers [article]'s primary topic one level (Much more, More, Normal). */
+    fun showLess(article: Article) = changeLevel(article) { lowerLevel(it) }
+
+    /**
+     * Applies [change] to [article]'s primary topic and names the new level with its meaning, e.g.
+     * "Science now at More (about 2× as often). Change it in Settings." (short enough for two lines
+     * of the message bar; Settings › Topics & keywords holds the control). Undo puts back the stored level.
+     */
+    private fun changeLevel(
+        article: Article,
+        change: UserPrefs.(topicId: String) -> UserPrefs,
+    ) {
         val topic = article.primaryTopic ?: return
         var previous: Level? = null
         changePrefs(
-            "Showing more like this",
+            text = { p -> "${topicName(topic)} now at ${p.levelOf(topic).labelWithMeaning}. Change it in Settings." },
             apply = { p ->
                 previous = p.topicLevels[topic]
-                p.raiseLevel(topic)
+                p.change(topic)
             },
             undo = { p -> previous?.let { p.setLevel(topic, it) } ?: p.copy(topicLevels = p.topicLevels - topic) },
         )
@@ -266,8 +281,8 @@ class FeedViewModel(
         )
     }
 
-    /** True when [topicId] is already at Much more, so Show more like this is disabled. */
-    fun isAtMuchMore(topicId: String): Boolean = prefs.value?.levelOf(topicId) == Level.MUCH_MORE
+    /** [topicId]'s level: the menu offers Show less like this above Normal and no Show more at Much more. */
+    fun levelOf(topicId: String): Level = prefs.value?.levelOf(topicId) ?: Level.NORMAL
 
     /**
      * Applies [apply] to the stored preferences and shows [text] with Undo. Undo applies [undo]
@@ -277,11 +292,24 @@ class FeedViewModel(
         text: String,
         apply: (UserPrefs) -> UserPrefs,
         undo: (UserPrefs) -> UserPrefs,
+    ) = changePrefs({ text }, apply, undo)
+
+    /** As above, with the message worded from the preferences after the change. */
+    private fun changePrefs(
+        text: (UserPrefs) -> String,
+        apply: (UserPrefs) -> UserPrefs,
+        undo: (UserPrefs) -> UserPrefs,
     ) {
         viewModelScope.launch {
             var changed = false
-            graph.preferencesStore.update { p -> apply(p).also { changed = it != p } }
-            showUndo(text) { if (changed) graph.preferencesStore.update(undo) }
+            var after: UserPrefs? = null
+            graph.preferencesStore.update { p ->
+                apply(p).also {
+                    after = it
+                    changed = it != p
+                }
+            }
+            showUndo(text(checkNotNull(after))) { if (changed) graph.preferencesStore.update(undo) }
         }
     }
 

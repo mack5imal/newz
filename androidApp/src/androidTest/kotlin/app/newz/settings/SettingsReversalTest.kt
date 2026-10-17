@@ -1,6 +1,7 @@
 package app.newz.settings
 
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -9,6 +10,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
@@ -225,12 +227,52 @@ class SettingsReversalTest {
         val atMore = relaunchAndCountScienceInTop()
 
         openSettings("Topics & keywords")
+        compose
+            .onNodeWithText(
+                "Science comes up about 2× as often as a Normal topic.",
+            ).performScrollTo()
+            .assertIsDisplayed()
         clickIn("Normal", hasTestTag(TopicsSemantics.row(TestCatalog.SCIENCE)))
+        compose.waitForText("Science gets the usual share of your feed.")
         compose.waitUntil(TIMEOUT) { currentPrefs().levelOf(TestCatalog.SCIENCE) == Level.NORMAL }
         backToFeed()
         val atNormal = relaunchAndCountScienceInTop()
 
         assertTrue("More gives Science more of the top cards ($atMore) than Normal ($atNormal)", atNormal < atMore)
+    }
+
+    @Test
+    fun boostedTopicThatIsNotFollowedIsListedAndLoweredFromTopics() {
+        start()
+        val prefs = currentPrefs()
+        TestPrefs.write(
+            prefs.copy(
+                followedTopics = prefs.followedTopics - TestCatalog.TECH,
+                topicLevels = prefs.topicLevels + (TestCatalog.TECH to Level.MUCH_MORE),
+            ),
+        )
+        openSettings("Topics & keywords")
+        val panel = hasTestTag(TopicsSemantics.BOOSTED_PANEL)
+        val row = hasTestTag(TopicsSemantics.row(TestCatalog.TECH)) and hasAnyAncestor(panel)
+        compose.onNode(hasText("Other topics you’ve boosted") and hasAnyAncestor(panel)).performScrollTo()
+        compose
+            .onNode(
+                hasText("Tech comes up about 3× as often as a Normal topic.") and hasAnyAncestor(row),
+            ).assertExists()
+
+        clickIn("More", row)
+        compose.waitUntil(TIMEOUT) { currentPrefs().levelOf(TestCatalog.TECH) == Level.MORE }
+        compose.waitForText("Tech comes up about 2× as often as a Normal topic.")
+
+        // Normal forgets the level, so the topic leaves the list; Undo brings it back.
+        clickIn("Normal", row)
+        compose.waitUntil(TIMEOUT) { TestCatalog.TECH !in currentPrefs().topicLevels }
+        compose.waitForText("Tech is back to Normal (the usual share).")
+        compose.waitUntil(TIMEOUT) { compose.onAllNodes(panel).fetchSemanticsNodes().isEmpty() }
+        compose.onNode(hasText("Undo") and hasClickAction()).performClick()
+        compose.waitUntil(TIMEOUT) { currentPrefs().levelOf(TestCatalog.TECH) == Level.MORE }
+        compose.waitUntil(TIMEOUT) { compose.onAllNodes(row).fetchSemanticsNodes().isNotEmpty() }
+        assertFalse(TestCatalog.TECH in currentPrefs().followedTopics)
     }
 
     /** Relaunches on the same cache and preferences, so the feed is ranked afresh; Science cards in the top 10. */

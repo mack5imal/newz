@@ -487,6 +487,7 @@ object NewzIcons {
         )
     }
     val iconArrowUp by lazy { lineIcon("arrow-up", "M12 19V6M6 12l6-6 6 6") }
+    val iconArrowDown by lazy { lineIcon("arrow-down", "M12 5v13M6 12l6 6 6-6") }
     val iconBan by lazy { lineIcon("ban", circle(12f, 12f, 9f), "M5.6 5.6l12.8 12.8") }
     val iconMinusCircle by lazy { lineIcon("minus-circle", circle(12f, 12f, 9f), "M8 12h8") }
     val iconMute by lazy { lineIcon("mute", "M4 9h4l5-4v14l-5-4H4zM17 9.5l5 5M22 9.5l-5 5") }

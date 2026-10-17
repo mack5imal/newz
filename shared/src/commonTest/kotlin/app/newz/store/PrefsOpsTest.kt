@@ -63,6 +63,27 @@ class PrefsOpsTest {
     }
 
     @Test
+    fun lowerLevelStepsDownAndForgetsTheLevelAtNormal() {
+        var p = UserPrefs(topicLevels = mapOf("tech" to Level.MUCH_MORE, "world" to Level.MORE))
+        p = p.lowerLevel("tech")
+        assertEquals(Level.MORE, p.levelOf("tech"))
+        p = p.lowerLevel("tech")
+        assertEquals(Level.NORMAL, p.levelOf("tech"))
+        assertEquals(mapOf("world" to Level.MORE), p.topicLevels)
+        assertEquals(p, p.lowerLevel("tech"))
+        assertEquals(emptyMap(), UserPrefs(topicLevels = mapOf("tech" to Level.NORMAL)).lowerLevel("tech").topicLevels)
+    }
+
+    @Test
+    fun levelWordingNamesTheLevelAndItsMeaning() {
+        assertEquals("Normal (the usual share)", Level.NORMAL.labelWithMeaning)
+        assertEquals("More (about 2× as often)", Level.MORE.labelWithMeaning)
+        assertEquals("Much more (about 3× as often)", Level.MUCH_MORE.labelWithMeaning)
+        assertEquals("Science gets the usual share of your feed.", Level.NORMAL.caption("Science"))
+        assertEquals("Science comes up about 3× as often as a Normal topic.", Level.MUCH_MORE.caption("Science"))
+    }
+
+    @Test
     fun removeThenRestoreOutletReturnsPreviousFollowState() {
         val before =
             UserPrefs(followedOutlets = mapOf("npr" to setOf("npr-news", "npr-politics"), "bbc" to setOf("bbc-world")))

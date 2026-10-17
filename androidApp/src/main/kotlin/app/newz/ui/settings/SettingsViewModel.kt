@@ -16,6 +16,7 @@ import app.newz.store.Level
 import app.newz.store.TextSize
 import app.newz.store.UserPrefs
 import app.newz.store.clearZip
+import app.newz.store.labelWithMeaning
 import app.newz.store.removeOutlet
 import app.newz.store.restoreOutlet
 import app.newz.store.restoreTopic
@@ -348,10 +349,42 @@ class SettingsViewModel(
             .sortedByDescending { it.value }
             .map { (id, _) -> TopicItem(id, topicName(id), p.topicLevels[id] ?: Level.NORMAL) }
 
+    /**
+     * Topics raised above Normal (from a card's Show more like this) that are neither followed,
+     * keyword topics nor muted, so their level can still be seen and lowered (SPEC S10).
+     */
+    fun boostedTopics(p: UserPrefs): List<TopicItem> {
+        val listed = p.followedTopics.toSet() + p.customTopics.map(::customTopicId) + p.mutedTopics.keys
+        return p.topicLevels
+            .filter { (id, level) -> level != Level.NORMAL && id !in listed }
+            .map { (id, level) -> TopicItem(id, topicName(id), level) }
+            .sortedBy { it.name.lowercase() }
+    }
+
     fun setLevel(
         topicId: String,
         level: Level,
     ) = update { it.setLevel(topicId, level) }
+
+    /**
+     * The level control of a boosted topic that is not followed: Normal forgets the level, so the
+     * row leaves the list, and says so with Undo.
+     */
+    fun setBoostedLevel(
+        topicId: String,
+        level: Level,
+    ) {
+        if (level != Level.NORMAL) return setLevel(topicId, level)
+        var previous: Level? = null
+        changePrefs(
+            "${topicName(topicId)} is back to ${Level.NORMAL.labelWithMeaning}.",
+            apply = { p ->
+                previous = p.topicLevels[topicId]
+                p.copy(topicLevels = p.topicLevels - topicId)
+            },
+            undo = { p -> previous?.let { p.setLevel(topicId, it) } ?: p },
+        )
+    }
 
     /**
      * Unfollows a catalog topic or removes a keyword topic, with Undo, which puts it back in its

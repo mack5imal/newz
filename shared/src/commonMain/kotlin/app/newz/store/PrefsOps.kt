@@ -74,6 +74,13 @@ fun UserPrefs.raiseLevel(topicId: String): UserPrefs {
     return setLevel(topicId, next)
 }
 
+/** MUCH_MORE -> MORE -> NORMAL; reaching NORMAL forgets the level (a missing level is NORMAL). */
+fun UserPrefs.lowerLevel(topicId: String): UserPrefs =
+    when (levelOf(topicId)) {
+        Level.MUCH_MORE -> setLevel(topicId, Level.MORE)
+        Level.MORE, Level.NORMAL -> copy(topicLevels = topicLevels - topicId)
+    }
+
 fun UserPrefs.setLevel(
     topicId: String,
     level: Level,

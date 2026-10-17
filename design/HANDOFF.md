@@ -214,6 +214,7 @@ How to draw them:
 | `icon-chevron` | `<path d="M9 6l6 6-6 6"/>` | trailing chevron on settings rows |
 | `icon-eye-off` | `<path d="M3 3l18 18M10.6 6.1A9 9 0 0 1 12 6c5 0 9 6 9 6a15.5 15.5 0 0 1-2.6 3.3M6.3 7.6C4.2 9.2 3 12 3 12s4 6 9 6c1.5 0 2.9-.4 4.1-1.1M9.9 9.9a3 3 0 0 0 4.2 4.2"/>` | Hide this article, Hidden articles row and empty state |
 | `icon-arrow-up` | `<path d="M12 19V6M6 12l6-6 6 6"/>` | Show more like this |
+| `icon-arrow-down` | `<path d="M12 5v13M6 12l6 6 6-6"/>` | Show less like this |
 | `icon-ban` | `<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>` | Don't show content from {outlet} |
 | `icon-minus-circle` | `<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>` | Don't show {topic} |
 | `icon-mute` | `<path d="M4 9h4l5-4v14l-5-4H4zM17 9.5l5 5M22 9.5l-5 5"/>` | Mute a keyword… |
@@ -346,6 +347,7 @@ Rows (`SheetActionRow`), in order:
 1. Save for later — `icon-bookmark`. Shows "Unsave" with the filled bookmark when the article is already saved.
 2. Hide this article — `icon-eye-off`.
 3. Show more like this — `icon-arrow-up`. Raises the article's main topic one level (Normal, then More, then Much more).
+   When that topic is above Normal, a note line sits above this row ("You’re seeing more {topic} — {level} ({meaning})", `type-row-sub` in `ink-muted`, padding 8 20 0), and a row follows it: Show less like this — `icon-arrow-down`, lowering the topic one level (Much more, then More, then Normal). At Normal neither appears.
 
 A 1 dp `line-subtle` divider, inset 20 dp at each side with 4 dp above and below, then:
 
@@ -363,7 +365,8 @@ Behaviour:
 States:
 - `card-menu.png` — normal.
 - `--saved` — row 1 reads "Unsave", with a filled icon.
-- `--much-more` — the article's topic is already at Much more. Row 3 becomes the disabled `SheetActionRow`, with "Already showing much more of {topic}" under the label.
+- `--more` — the article's topic is at More: the note "You’re seeing more Science — More (about 2× as often)" above row 3, and Show less like this after it.
+- `--much-more` — the article's topic is already at Much more. Row 3 becomes the disabled `SheetActionRow`, with "Already showing much more of {topic}" under the label; the note and Show less like this show as at More.
 - `--confirmation` — after "Don't show content from The Harbor Ledger": the sheet has closed, that outlet's cards are gone, and the snackbar reads "The Harbor Ledger won’t appear. Bring it back in Settings › Sources." with "Undo".
 - `--dark`.
 
@@ -477,9 +480,12 @@ Layout: `AppBarSub` "Topics & keywords".
 
 Panel "Followed topics" (with count):
 - Each row: topic name, an × `IconButton` (spoken "Unfollow {topic}"), and below it a `SegmentedControl` Normal / More / Much more.
+- Under each control, a caption (`type-row-sub`, `ink-muted`) says what the selected level means: "{topic} gets the usual share of your feed." at Normal, else "{topic} comes up about 2× as often as a Normal topic." (3× at Much more). The control keeps its short labels.
 - After 3 topics, "Show all {n}".
 
 Panel "Your keyword topics" — the same row layout for custom keyword topics, with × spoken "Remove {topic}".
+
+Panel "Other topics you’ve boosted" (with count; only when there are any) — topics raised above Normal from a card's Show more like this that are not followed, keyword or muted topics. A hint line, then the same row layout without the ×. Choosing Normal forgets the level, so the row leaves the panel, with a `Snackbar` "{topic} is back to Normal (the usual share)." and "Undo". (Unfollowing a topic forgets its level, so an unfollowed topic is listed here only when boosted afterwards.)
 
 Panel "Muted topics" — rows with "Restore".
 
@@ -692,7 +698,12 @@ Strings are exact. Signage-styled text (see `font-signage`) displays in capitals
 - `Saved for later. Find it in Saved.` (snackbar after Save for later; not drawn)
 - `Removed from Saved.` (snackbar after Unsave; not drawn)
 - `Article hidden. Bring it back in Settings › Hidden articles.`
-- `Showing more like this` (snackbar; not drawn)
+- `You’re seeing more {topic} — {level} ({meaning})` (e.g. `Science`, `More`, `about 2× as often`)
+- `Show less like this`
+- `{topic} now at {level} ({meaning}). Change it in Settings.` (snackbar after Show more or Show less like this, kept to two lines; the control is in Settings › Topics & keywords; not drawn)
+- `Normal (the usual share)`
+- `More (about 2× as often)`
+- `Much more (about 3× as often)`
 - `{outlet} won’t appear. Bring it back in Settings › Sources.` (e.g. `The Harbor Ledger`)
 - `{topic} won’t appear. Bring it back in Settings › Topics & keywords.` (e.g. `Science`; not drawn)
 - `{outlet} marked as paywalled. Change it in Settings › Sources.` (snackbar; not drawn)
@@ -830,10 +841,15 @@ Strings are exact. Signage-styled text (see `font-signage`) displays in capitals
 - `More`
 - `Much more`
 - `{topic} is at the top level, so Show more like this is turned off for it.` (e.g. `Science`)
+- `{topic} gets the usual share of your feed.` (e.g. `Science`)
+- `{topic} comes up {meaning} as a Normal topic.` (e.g. `Science`, `about 2× as often`)
 - `Show all {n}`
 - `Your keyword topics`
 - `{keyword topic}` (e.g. `Seattle`, `Heat pumps`)
 - `Remove {keyword topic}` (spoken)
+- `Other topics you’ve boosted`
+- `Topics you raised from an article’s ⋮ menu but don’t follow. Set Normal to drop one.`
+- `{topic} is back to Normal (the usual share).` (e.g. `Tech`; snackbar; not drawn)
 - `Muted topics`
 - `{muted topic}` (e.g. `Celebrity`, `Crypto`)
 - `Restore`
