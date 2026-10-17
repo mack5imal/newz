@@ -51,17 +51,35 @@ class FeedViewModel(
     private val selectionState = MutableStateFlow(graph.topicSelection)
     val selection: StateFlow<Set<String>> = selectionState.asStateFlow()
 
+    val prefs: StateFlow<UserPrefs?> =
+        graph.preferencesStore.prefs.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /**
+     * The feed as the repository serves it, before the topic selection. Paging keys on this: a
+     * page that adds no card in the selected topics still changes it, so the next page is asked for.
+     */
+    val servedFeed: StateFlow<FeedState> =
+        repository.feed.stateIn(viewModelScope, SharingStarted.Eagerly, FeedState.Loading(firstLoad = true))
+
+    /**
+     * The selected ids that are still chips (followed or custom topics that are not muted). A
+     * selected topic that is later muted or unfollowed stops filtering, so the filter always
+     * agrees with the "Showing …" line and Clear filter. Before preferences load, the whole
+     * selection applies.
+     */
+    val activeSelection: StateFlow<Set<String>> =
+        combine(selectionState, prefs) { selected, p ->
+            if (p == null) selected else selected intersect chips(p).mapTo(HashSet()) { it.id }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, graph.topicSelection)
+
     /**
      * The feed with the topic selection applied to the cards served so far. Filtering here, not
      * in the engine, keeps every card in its place: clearing the selection shows exactly the same
      * feed again (SPEC S14). An empty filtered page keeps loading pages until the end.
      */
     val feed: StateFlow<FeedState> =
-        combine(repository.feed, selectionState) { state, selected -> state.filtered(selected) }
+        combine(servedFeed, activeSelection) { state, selected -> state.filtered(selected) }
             .stateIn(viewModelScope, SharingStarted.Eagerly, FeedState.Loading(firstLoad = true))
-
-    val prefs: StateFlow<UserPrefs?> =
-        graph.preferencesStore.prefs.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val refreshingState = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = refreshingState.asStateFlow()

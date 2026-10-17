@@ -119,6 +119,7 @@ fun FeedScreen(
     val c = LocalNewzPalette.current
     val context = LocalContext.current
     val state by viewModel.feed.collectAsState()
+    val served by viewModel.servedFeed.collectAsState()
     val prefs by viewModel.prefs.collectAsState()
     val selection by viewModel.selection.collectAsState()
     val refreshing by viewModel.refreshing.collectAsState()
@@ -127,7 +128,7 @@ fun FeedScreen(
     val listState = rememberLazyListState()
     val chips = prefs?.let(viewModel::chips).orEmpty()
 
-    LoadMoreEffect(listState, state, viewModel::loadMore)
+    LoadMoreEffect(listState, served, viewModel::loadMore)
 
     Box(Modifier.fillMaxSize().background(c.paper)) {
         Column(Modifier.fillMaxSize()) {
@@ -206,16 +207,20 @@ fun FeedScreen(
     }
 }
 
-/** Calls [loadMore] whenever the last visible item comes within [LOAD_MORE_THRESHOLD] of the end. */
+/**
+ * Calls [loadMore] whenever the last visible item comes within [LOAD_MORE_THRESHOLD] of the end.
+ * [served] is the unfiltered feed, so the trigger re-arms on every served page.
+ */
 @Composable
 private fun LoadMoreEffect(
     listState: LazyListState,
-    state: FeedState,
+    served: FeedState,
     loadMore: () -> Unit,
 ) {
-    val content = state as? FeedState.Content
+    val content = served as? FeedState.Content
     if (content == null || content.endReached) return
-    // Keyed on the state itself: a filtered page that shows few or no cards keeps asking for more.
+    // Keyed on the unfiltered state: a page with no card in the selected topics leaves the
+    // filtered feed unchanged, but still changes this, so the next page is asked for.
     LaunchedEffect(listState, content) {
         snapshotFlow {
             val info = listState.layoutInfo

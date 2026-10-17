@@ -20,6 +20,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ActivityScenario
@@ -28,6 +29,7 @@ import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import app.newz.MainActivity
 import app.newz.catalog.PaywallStatus
+import app.newz.filter.customTopicId
 import app.newz.store.UserPrefs
 import app.newz.testing.MockFeedServer
 import app.newz.testing.TestApp
@@ -189,6 +191,71 @@ class FeedScreenTest {
     }
 
     @Test
+    fun aTopicFirstMatchedBeyondThePageStillPagesToTheEnd() {
+        // 96 cards, five pages. Only the oldest item of feeds 0 and 1 matches the custom topic, so
+        // each ranks last in its topic queue: the first four pages hold no matching card.
+        server.fill(itemsPerFeed = 12, imageEvery = 0)
+        val matchingFeeds = server.feeds.take(2)
+        matchingFeeds.forEach { config ->
+            val last = config.items.last()
+            config.items = config.items.dropLast(1) + last.copy(summary = "A $CUSTOM_WORD report.")
+        }
+        val matching = matchingFeeds.map { it.items.last().link }.toSet()
+        val catalog = TestCatalog.build(server)
+        TestApp.install(catalog)
+        val prefs = TestPrefs.onboarded().copy(customTopics = listOf(CUSTOM_WORD))
+        TestPrefs.write(prefs)
+        launch()
+        compose.waitForStableFeed(minCards = 20)
+        // Relaunch on the filled cache: the first page is then the ranked order, not whichever
+        // feed landed first.
+        scenario?.close()
+        TestApp.install(catalog, keepDatabase = true)
+        TestPrefs.write(prefs)
+        launch()
+        compose.waitForStableFeed(minCards = 20)
+        val customId = customTopicId(CUSTOM_WORD)
+        val firstPage = compose.servedCards().take(20)
+        assertEquals(20, firstPage.size)
+        assertTrue("first 20 cards hold no $CUSTOM_WORD article", firstPage.none { customId in it.topics })
+
+        // The custom chip comes after the five followed topics: bring it into the chip row's view.
+        compose.onNode(hasText(CUSTOM_WORD) and hasClickAction()).performScrollTo().performClick()
+        // No scrolling: the filtered pages alone must keep asking for more until the end.
+        compose.waitUntil(10_000) { compose.servedCards().map { it.url }.toSet() == matching }
+        // The end item ("end" key) exists only once the last page is served; it may sit below the
+        // screen, so find it by key first and only then scroll to it to see it.
+        val list = compose.onNodeWithTag(FeedSemantics.LIST_TAG)
+        compose.waitUntil(10_000) { list.fetchSemanticsNode().config[SemanticsProperties.IndexForKey]("end") >= 0 }
+        list.performScrollToIndex(list.fetchSemanticsNode().config[SemanticsProperties.IndexForKey]("end"))
+        compose.onNodeWithText(CAUGHT_UP).assertIsDisplayed()
+        val served = compose.servedCards()
+        assertEquals(matching, served.map { it.url }.toSet())
+        assertTrue(served.all { customId in it.topics })
+    }
+
+    @Test
+    fun mutingTheSelectedTopicStopsItFiltering() {
+        server.fill(itemsPerFeed = 3)
+        TestApp.install(TestCatalog.build(server))
+        val prefs = TestPrefs.onboarded()
+        launch()
+        compose.waitForStableFeed(minCards = 20)
+
+        compose.onNode(hasText("Science") and hasClickAction()).performClick()
+        compose.waitForText("Showing Science")
+        TestPrefs.write(prefs.copy(mutedTopics = mapOf(TestCatalog.SCIENCE to Clock.System.now())))
+
+        compose.waitUntil(5_000) {
+            val cards = compose.servedCards()
+            cards.isNotEmpty() && cards.none { TestCatalog.SCIENCE in it.topics }
+        }
+        assertTrue(compose.visibleCards().isNotEmpty())
+        assertTrue(compose.onAllNodesWithText("Showing Science").fetchSemanticsNodes().isEmpty())
+        assertTrue(compose.onAllNodesWithText("Clear filter").fetchSemanticsNodes().isEmpty())
+    }
+
+    @Test
     fun groupedCardsShowSourceCountsAndOpenTheStorySheet() {
         val now = Clock.System.now()
         server.fill(itemsPerFeed = 2, now = now, newestAge = 6.hours)
@@ -341,6 +408,7 @@ class FeedScreenTest {
         const val ALL_FILTERED = "Nothing to show — your filters hide everything"
         const val OFFLINE_BANNER = "Offline — showing articles loaded earlier"
         const val MAX_STEPS = 120
+        const val CUSTOM_WORD = "zeppelin"
         val GAP_PROBE = 7.dp
         val AGE = Regex("just now|\\d+ (minute|hour|day)s? ago")
     }
