@@ -1,0 +1,24 @@
+-- Feeds the user added by URL. kind is a FeedKind name (RSS, ATOM, RDF).
+CREATE TABLE custom_feed (
+    id TEXT NOT NULL PRIMARY KEY,
+    url TEXT NOT NULL,
+    title TEXT NOT NULL,
+    siteUrl TEXT,
+    kind TEXT NOT NULL,
+    addedAt INTEGER NOT NULL
+);
+
+upsert:
+INSERT OR REPLACE INTO custom_feed(id, url, title, siteUrl, kind, addedAt) VALUES (?, ?, ?, ?, ?, ?);
+
+insert:
+INSERT INTO custom_feed(id, url, title, siteUrl, kind, addedAt) VALUES (?, ?, ?, ?, ?, ?);
+
+delete:
+DELETE FROM custom_feed WHERE id = ?;
+
+deleteAll:
+DELETE FROM custom_feed;
+
+selectAll:
+SELECT * FROM custom_feed ORDER BY addedAt, id;

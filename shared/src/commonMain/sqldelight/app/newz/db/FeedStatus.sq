@@ -1,0 +1,16 @@
+-- Per-feed health: when it last refreshed, since when it has been failing, and why.
+CREATE TABLE feed_status (
+    feedId TEXT NOT NULL PRIMARY KEY,
+    lastOkAt INTEGER,
+    failingSince INTEGER,
+    lastError TEXT
+);
+
+upsert:
+INSERT OR REPLACE INTO feed_status(feedId, lastOkAt, failingSince, lastError) VALUES (?, ?, ?, ?);
+
+selectById:
+SELECT * FROM feed_status WHERE feedId = ?;
+
+selectAll:
+SELECT * FROM feed_status ORDER BY feedId;

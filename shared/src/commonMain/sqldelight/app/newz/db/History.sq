@@ -1,0 +1,17 @@
+-- Reading history (SPEC Prohibitions): only "this article, from this outlet with these topics,
+-- was opened at this time". No search terms, scroll position or dwell time; add no columns here.
+CREATE TABLE history (
+    articleId TEXT NOT NULL,
+    outletId TEXT NOT NULL,
+    topics TEXT NOT NULL,
+    openedAt INTEGER NOT NULL
+);
+
+insert:
+INSERT INTO history(articleId, outletId, topics, openedAt) VALUES (?, ?, ?, ?);
+
+deleteAll:
+DELETE FROM history;
+
+selectAll:
+SELECT * FROM history ORDER BY openedAt, articleId;

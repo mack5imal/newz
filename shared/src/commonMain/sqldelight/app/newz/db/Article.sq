@@ -1,0 +1,38 @@
+-- The 7-day article cache. id is a stable hash of guid (or url); publishedAt falls back to
+-- firstSeenAt when the feed gave no date, so it is never null. topics is a JSON string array.
+CREATE TABLE article (
+    id TEXT NOT NULL PRIMARY KEY,
+    feedId TEXT NOT NULL,
+    outletId TEXT NOT NULL,
+    guid TEXT NOT NULL,
+    url TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT,
+    imageUrl TEXT,
+    publishedAt INTEGER NOT NULL,
+    firstSeenAt INTEGER NOT NULL,
+    topics TEXT NOT NULL
+);
+
+CREATE INDEX article_publishedAt ON article(publishedAt);
+
+insertIfAbsent:
+INSERT OR IGNORE INTO article(id, feedId, outletId, guid, url, title, summary, imageUrl, publishedAt, firstSeenAt, topics)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+refresh:
+UPDATE article SET url = :url, title = :title, summary = :summary, imageUrl = :imageUrl, publishedAt = :publishedAt
+WHERE id = :id;
+
+refreshKeepingDate:
+UPDATE article SET url = :url, title = :title, summary = :summary, imageUrl = :imageUrl
+WHERE id = :id;
+
+selectById:
+SELECT * FROM article WHERE id = ?;
+
+selectAll:
+SELECT * FROM article ORDER BY publishedAt DESC, id;
+
+pruneBefore:
+DELETE FROM article WHERE publishedAt < :cutoff AND id NOT IN (SELECT articleId FROM saved);

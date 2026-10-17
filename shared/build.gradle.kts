@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kotlin.multiplatform.library)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.sqldelight)
 }
 
 /**
@@ -218,6 +219,10 @@ kotlin {
             implementation(libs.rssparser)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.datetime)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.sqldelight.runtime)
+            implementation(libs.datastore.preferences.core)
+            implementation(libs.okio)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -226,17 +231,26 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.sqldelight.android.driver)
         }
         getByName("androidHostTest").dependencies {
             implementation(libs.kxml2)
         }
         jvmMain.dependencies {
             implementation(libs.ktor.client.okhttp)
-            // Only the catalog health-check tool (app.newz.tools) reads JSON; the app does not.
-            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.sqldelight.sqlite.driver)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
+            implementation(libs.sqldelight.native.driver)
+        }
+    }
+}
+
+sqldelight {
+    databases {
+        create("NewzDatabase") {
+            packageName.set("app.newz.db")
         }
     }
 }

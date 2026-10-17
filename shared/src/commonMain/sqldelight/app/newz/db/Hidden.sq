@@ -1,0 +1,26 @@
+-- Articles the user hid. Kept 30 days so the feed can keep filtering them, then pruned.
+CREATE TABLE hidden (
+    articleId TEXT NOT NULL PRIMARY KEY,
+    hiddenAt INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    outletId TEXT NOT NULL,
+    url TEXT NOT NULL
+);
+
+insertIfAbsent:
+INSERT OR IGNORE INTO hidden(articleId, hiddenAt, title, outletId, url) VALUES (?, ?, ?, ?, ?);
+
+insert:
+INSERT INTO hidden(articleId, hiddenAt, title, outletId, url) VALUES (?, ?, ?, ?, ?);
+
+delete:
+DELETE FROM hidden WHERE articleId = ?;
+
+deleteAll:
+DELETE FROM hidden;
+
+selectAll:
+SELECT * FROM hidden ORDER BY hiddenAt DESC, articleId;
+
+pruneBefore:
+DELETE FROM hidden WHERE hiddenAt < ?;

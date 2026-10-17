@@ -1,0 +1,35 @@
+-- Saved articles keep a full copy of the article, so the 7-day article prune never touches them.
+CREATE TABLE saved (
+    articleId TEXT NOT NULL PRIMARY KEY,
+    savedAt INTEGER NOT NULL,
+    feedId TEXT NOT NULL,
+    outletId TEXT NOT NULL,
+    guid TEXT NOT NULL,
+    url TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT,
+    imageUrl TEXT,
+    publishedAt INTEGER NOT NULL,
+    firstSeenAt INTEGER NOT NULL,
+    topics TEXT NOT NULL
+);
+
+insertIfAbsent:
+INSERT OR IGNORE INTO saved(articleId, savedAt, feedId, outletId, guid, url, title, summary, imageUrl, publishedAt, firstSeenAt, topics)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+insert:
+INSERT INTO saved(articleId, savedAt, feedId, outletId, guid, url, title, summary, imageUrl, publishedAt, firstSeenAt, topics)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+delete:
+DELETE FROM saved WHERE articleId = ?;
+
+deleteAll:
+DELETE FROM saved;
+
+selectAll:
+SELECT * FROM saved ORDER BY savedAt DESC, articleId;
+
+isSaved:
+SELECT count(*) FROM saved WHERE articleId = ?;
