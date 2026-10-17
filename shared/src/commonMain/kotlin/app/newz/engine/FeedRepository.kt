@@ -2,6 +2,7 @@ package app.newz.engine
 
 import app.newz.catalog.Catalog
 import app.newz.feed.Article
+import app.newz.filter.FEED_WINDOW
 import app.newz.net.newzHttpClient
 import app.newz.store.ArticleStore
 import app.newz.store.UserPrefs
@@ -13,6 +14,7 @@ import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -20,8 +22,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -61,9 +61,9 @@ sealed interface FeedState {
  * Collecting [feed] the first time shows cached eligible cards at once (cache-first), then starts
  * a refresh. Cards appear as soon as the first feed lands when nothing was shown yet; a finished
  * load merges into the served cards without moving or duplicating them. Preferences and the
- * hidden/saved/history tables are re-read at every composition.
+ * hidden/saved/history tables are re-read at every composition. A preference change recomposes
+ * from the cache at once; store-side changes do so through [invalidate].
  */
-@OptIn(ExperimentalAtomicApi::class)
 class FeedRepository(
     private val scope: CoroutineScope,
     private val store: ArticleStore,
@@ -76,7 +76,6 @@ class FeedRepository(
     pageSize: Int = FeedPager.DEFAULT_PAGE_SIZE,
 ) {
     private val state = MutableStateFlow<FeedState>(FeedState.Loading(firstLoad = true))
-    private val started = AtomicBoolean(false)
     private val lock = Mutex()
     private val pager = FeedPager(pageSize)
     private var selectedTopics: Set<String> = emptySet()
@@ -84,6 +83,10 @@ class FeedRepository(
     private var offline = false
     private var failing: Set<String> = emptySet()
     private var savedIds: Set<String> = emptySet()
+    private var composedPrefs: UserPrefs? = null
+
+    /** The cache-first start, launched in [scope] once so a cancelled collector cannot abort it. */
+    private val startJob: Job by lazy { scope.launch { start() } }
 
     private val coordinator =
         RefreshCoordinator(
@@ -101,7 +104,7 @@ class FeedRepository(
     /** The feed. The first collection triggers the cache-first start. */
     val feed: Flow<FeedState> =
         flow {
-            start()
+            startJob.join()
             emitAll(state)
         }
 
@@ -135,8 +138,17 @@ class FeedRepository(
             publish(readSnapshot(), reset = true, loading = coordinator.isRunning.value)
         }
 
+    /**
+     * Recomposes the feed from the cache without fetching, for store-side changes (hide, unhide,
+     * save, unsave) made by phases 12-17: served cards keep their places and excluded ones drop out.
+     */
+    fun invalidate(): Job = scope.launch { recompose() }
+
+    private suspend fun recompose() {
+        publish(readSnapshot(), reset = false, loading = coordinator.isRunning.value)
+    }
+
     private suspend fun start() {
-        if (!started.compareAndSet(expectedValue = false, newValue = true)) return
         offline = !isOnline()
         failing =
             withContext(storeDispatcher) {
@@ -144,6 +156,9 @@ class FeedRepository(
             }
         publish(readSnapshot(), reset = true, loading = !offline)
         coordinator.refresh()
+        scope.launch {
+            prefs.distinctUntilChanged().collect { if (it != composedPrefs) recompose() }
+        }
     }
 
     private suspend fun readSnapshot(): FeedSnapshot {
@@ -177,14 +192,21 @@ class FeedRepository(
             if (reset) pager.reset(groups) else pager.submit(groups)
             if (pager.servedGroups.size < pager.pageSize) pager.page(0)
             savedIds = snapshot.savedIds
+            composedPrefs = snapshot.prefs
             state.value =
                 when {
                     pager.servedGroups.isNotEmpty() -> content()
-                    snapshot.articles.isEmpty() && offline -> FeedState.Empty(EmptyReason.NO_CACHE_OFFLINE)
-                    snapshot.articles.isEmpty() && loading -> FeedState.Loading(firstLoad = !loadedOnce)
+                    offline && !snapshot.hasArticlesInWindow() -> FeedState.Empty(EmptyReason.NO_CACHE_OFFLINE)
+                    offline -> FeedState.Empty(EmptyReason.ALL_FILTERED)
+                    loading -> FeedState.Loading(firstLoad = !loadedOnce)
                     else -> FeedState.Empty(EmptyReason.ALL_FILTERED)
                 }
         }
+    }
+
+    private fun FeedSnapshot.hasArticlesInWindow(): Boolean {
+        val now = clock()
+        return articles.any { minOf(FeedComposer.toArticle(it).date, now) >= now - FEED_WINDOW }
     }
 
     private fun content(): FeedState.Content =

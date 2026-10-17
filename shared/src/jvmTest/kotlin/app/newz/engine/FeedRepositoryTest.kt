@@ -1,14 +1,22 @@
 package app.newz.engine
 
 import app.newz.feed.ParsedItem
+import app.newz.net.newzHttpClient
+import app.newz.store.muteKeyword
 import app.newz.store.muteTopic
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 
 class FeedRepositoryTest {
@@ -148,5 +156,145 @@ class FeedRepositoryTest {
             h.prefs.value = h.prefs.value.copy(readingHistoryOn = false)
             repo.recordOpen(article).join()
             assertEquals(1, h.store.listHistory().size)
+        }
+
+    @Test
+    fun everyFeedFailingWithCacheIsContentOffline() =
+        runTest {
+            val h = EngineHarness()
+            h.failing += listOf("a", "b", "c")
+            h.cache("a", 2)
+            val repo = h.repository(backgroundScope)
+            repo.feed.first()
+            repo.refresh().join()
+            val content = assertIs<FeedState.Content>(repo.feed.first())
+            assertTrue(content.offline)
+            assertEquals(2, content.cards.size)
+            assertEquals(setOf("a-world", "b-world", "c-world"), content.failingFeeds)
+            assertEquals(listOf(1, 1, 1), listOf("a", "b", "c").map(h::requestsTo))
+        }
+
+    @Test
+    fun everyFeedFailingWithNoCacheIsEmptyNoCacheOffline() =
+        runTest {
+            val h = EngineHarness()
+            h.failing += listOf("a", "b", "c")
+            val repo = h.repository(backgroundScope)
+            repo.feed.first()
+            repo.refresh().join()
+            assertEquals(FeedState.Empty(EmptyReason.NO_CACHE_OFFLINE), repo.feed.first())
+        }
+
+    private fun EngineHarness.cacheStale(count: Int) {
+        val parsed =
+            (0 until count).map { i ->
+                ParsedItem(
+                    "old-$i",
+                    "https://a.example/old-$i",
+                    EngineHarness.uniqueTitle(900 + i),
+                    null,
+                    null,
+                    now - 8.days,
+                )
+            }
+        store.upsert("a-world", "a", listOf("world"), parsed, now)
+    }
+
+    @Test
+    fun staleOnlyCacheWhileOnlineLoadRunsIsLoading() =
+        runTest {
+            val h = EngineHarness()
+            h.cacheStale(3)
+            val gate = CompletableDeferred<Unit>()
+            h.gate = gate
+            val repo = h.repository(backgroundScope)
+            assertEquals(FeedState.Loading(firstLoad = true), repo.feed.first())
+            gate.complete(Unit)
+            repo.refresh().join()
+        }
+
+    @Test
+    fun staleOnlyCacheOfflineIsEmptyNoCacheOffline() =
+        runTest {
+            val h = EngineHarness()
+            h.online = false
+            h.cacheStale(3)
+            val repo = h.repository(backgroundScope)
+            assertEquals(FeedState.Empty(EmptyReason.NO_CACHE_OFFLINE), repo.feed.first())
+        }
+
+    @Test
+    fun aCancelledFirstCollectorDoesNotAbortTheStart() =
+        runTest {
+            val h = EngineHarness()
+            h.online = false
+            h.cache("a", 2)
+            val reached = CompletableDeferred<Unit>()
+            val hold = CompletableDeferred<Unit>()
+            val heldPrefs =
+                flow {
+                    reached.complete(Unit)
+                    hold.await()
+                    emitAll(h.prefs)
+                }
+            val repo =
+                FeedRepository(
+                    scope = backgroundScope,
+                    store = h.store,
+                    prefs = heldPrefs,
+                    catalog = h.catalog,
+                    client = newzHttpClient(h.engine),
+                    isOnline = { h.online },
+                    clock = { h.now },
+                )
+            val firstCollector = launch { repo.feed.collect { } }
+            reached.await()
+            firstCollector.cancelAndJoin()
+            hold.complete(Unit)
+            val state = repo.feed.first { it !is FeedState.Loading }
+            assertEquals(2, assertIs<FeedState.Content>(state).cards.size)
+        }
+
+    @Test
+    fun prefsAndStoreChangesRecomposeWithoutFetching() =
+        runTest {
+            val h = EngineHarness()
+            h.items["a"] =
+                listOf(TestItem("a-1", "Zebra escapes from city zoo"), TestItem("a-2", EngineHarness.uniqueTitle(1)))
+            h.items["b"] =
+                listOf(TestItem("b-1", EngineHarness.uniqueTitle(2)), TestItem("b-2", EngineHarness.uniqueTitle(4)))
+            h.items["c"] = listOf(TestItem("c-1", EngineHarness.uniqueTitle(3)))
+            val repo = h.repository(backgroundScope)
+            repo.feed.first()
+            repo.refresh().join()
+            val before = assertIs<FeedState.Content>(repo.feed.first())
+            assertEquals(5, before.cards.size)
+            val requests = h.requests.values.sumOf { it.get() }
+
+            h.prefs.value = h.prefs.value.muteKeyword("zebra", h.now)
+            val muted =
+                repo.feed.first { s ->
+                    s is FeedState.Content &&
+                        s.cards.none {
+                            it.group.lead.title
+                                .contains("Zebra")
+                        }
+                } as FeedState.Content
+            val mutedIds = muted.cards.map { it.group.lead.id }
+            val expected =
+                before.cards
+                    .map { it.group.lead }
+                    .filterNot { it.title.contains("Zebra") }
+                    .map { it.id }
+            assertEquals(4, expected.size)
+            assertEquals(expected, mutedIds)
+            assertEquals(requests, h.requests.values.sumOf { it.get() })
+
+            val target = mutedIds[1]
+            h.store.hide(requireNotNull(h.store.article(target)), h.now)
+            repo.invalidate().join()
+            val after = assertIs<FeedState.Content>(repo.feed.first())
+            assertEquals(mutedIds - target, after.cards.map { it.group.lead.id })
+            assertEquals(requests, h.requests.values.sumOf { it.get() })
         }
 }

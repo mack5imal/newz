@@ -32,7 +32,7 @@ class LoadResult(
 
 /**
  * Runs feed loads one at a time (SPEC S5, S25). [refresh] while a load is running joins it: no
- * second fetch starts. A load fetches the feeds followed when it starts, reporting each through
+ * second fetch starts. A load whose followed sources all fail counts as offline. A load fetches the feeds followed when it starts, reporting each through
  * [onProgress], prunes the cache to [ArticleStore.ARTICLE_RETENTION] (and expired hides), then
  * re-reads the current [UserPrefs] and store into a [FeedSnapshot] and hands it to [onLoaded]
  * before the load completes.
@@ -78,10 +78,14 @@ class RefreshCoordinator(
                     FeedFetcher.followedSources(startPrefs, catalog, store.listCustomFeeds())
                 }
             var offline = false
+            var anyOk = false
             fetcher.fetch(sources).collect { progress ->
                 if (progress is FetchProgress.Offline) offline = true
+                if (progress is FetchProgress.FeedDone && progress.outcome is FeedOutcome.Ok) anyOk = true
                 onProgress(progress)
             }
+            // Every source failing reads as offline (SPEC S25), so the cache shows with the banner.
+            if (sources.isNotEmpty() && !anyOk) offline = true
             val latest = prefs.first()
             val result =
                 withContext(storeDispatcher) {
