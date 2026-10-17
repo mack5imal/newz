@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.ContentScale
@@ -124,7 +125,15 @@ fun CardStrip(
 }
 
 /**
- * `ArticleImage` — the article photo at full width and 16:9, cropped to fill. It shows the
+ * Where a cropped photo is anchored: centred across, and a quarter of the way down. A tall photo
+ * keeps its upper part, where faces usually are, instead of losing the top half; a wide photo
+ * crops only its sides, which this leaves centred.
+ */
+internal val PhotoAlignment = BiasAlignment(horizontalBias = 0f, verticalBias = -0.5f)
+
+/**
+ * `ArticleImage` — the article photo at full width and 16:9, cropped to fill (anchored by
+ * [PhotoAlignment], so tall photos keep their top). It shows the
  * `image-placeholder` with `image-hatch` lines every 11 dp until it loads and keeps it if loading
  * fails. Loaded only through the guarded [imageLoader].
  */
@@ -148,6 +157,7 @@ fun ArticleImage(
             contentDescription = contentDescription,
             imageLoader = imageLoader,
             contentScale = ContentScale.Crop,
+            alignment = PhotoAlignment,
             modifier = Modifier.matchParentSize(),
         )
     }
@@ -342,6 +352,7 @@ fun SavedCard(
                         contentDescription = null,
                         imageLoader = imageLoader,
                         contentScale = ContentScale.Crop,
+                        alignment = PhotoAlignment,
                         modifier = Modifier.matchParentSize(),
                     )
                 }
