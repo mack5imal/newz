@@ -5,13 +5,27 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.newz.AppGraph
 import app.newz.catalog.PaywallStatus
+import app.newz.engine.FeedCard
 import app.newz.engine.FeedState
 import app.newz.feed.AgeFormatter
 import app.newz.feed.Article
 import app.newz.filter.CUSTOM_TOPIC_PREFIX
 import app.newz.filter.customTopicId
+import app.newz.store.Level
 import app.newz.store.UserPrefs
+import app.newz.store.flagPaywall
+import app.newz.store.levelOf
+import app.newz.store.muteKeyword
+import app.newz.store.muteTopic
+import app.newz.store.raiseLevel
+import app.newz.store.removeOutlet
+import app.newz.store.restoreOutlet
+import app.newz.store.restoreTopic
+import app.newz.store.setLevel
+import app.newz.store.unflagPaywall
+import app.newz.store.unmuteKeyword
 import app.newz.ui.components.TagKind
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +33,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.net.URI
 
 /** One chip in the feed's topic row. */
@@ -37,7 +52,10 @@ data class FeedMessage(
 
 /**
  * The feed screen's state holder: the [FeedState] from [app.newz.engine.FeedRepository], the
- * topic chip selection, pull-to-refresh, and opening and sharing articles.
+ * topic chip selection, pull-to-refresh, opening and sharing articles, and the card menu's and
+ * keyword sheet's actions. Each action is written to preferences or the article store at once (so
+ * it survives refresh and restart) and shows its message with an Undo that reverts exactly what
+ * it changed: nothing, when the action found the change already made.
  *
  * The topic selection lasts while the process lives and resets on restart (SPEC Assumptions):
  * it is held here and seeded from [AppGraph.topicSelection], never written to preferences, and
@@ -144,6 +162,141 @@ class FeedViewModel(
         article: Article,
     ) {
         graph.shareLauncher.share(context, article.title, article.url)
+    }
+
+    // Card menu (design `card-menu`) and keyword sheet (design `keyword-mute`) actions.
+
+    /** Save for later, or Unsave when [card] is already saved. */
+    fun toggleSaved(card: FeedCard) {
+        val id = card.group.lead.id
+        val store = graph.articleStore
+        viewModelScope.launch {
+            val stored = withContext(Dispatchers.IO) { store.article(id) } ?: return@launch
+            if (card.saved) {
+                withContext(Dispatchers.IO) { store.unsave(id) }
+                graph.feedRepository.invalidate()
+                showUndo("Removed from saved") {
+                    withContext(Dispatchers.IO) { store.save(stored, graph.clock()) }
+                }
+            } else {
+                val wasSaved =
+                    withContext(Dispatchers.IO) { store.isSaved(id).also { store.save(stored, graph.clock()) } }
+                graph.feedRepository.invalidate()
+                showUndo("Saved for later") {
+                    if (!wasSaved) withContext(Dispatchers.IO) { store.unsave(id) }
+                }
+            }
+        }
+    }
+
+    /** Hides every article of [card]'s story group, so the card leaves the feed. */
+    fun hide(card: FeedCard) {
+        val store = graph.articleStore
+        val ids = card.group.members().map { it.id }
+        viewModelScope.launch {
+            val added =
+                withContext(Dispatchers.IO) {
+                    val hidden = store.listHidden().mapTo(HashSet()) { it.articleId }
+                    val now = graph.clock()
+                    ids
+                        .filter { it !in hidden }
+                        .mapNotNull(store::article)
+                        .onEach { store.hide(it, now) }
+                        .map { it.id }
+                }
+            graph.feedRepository.invalidate()
+            showUndo("Article hidden") {
+                withContext(Dispatchers.IO) { added.forEach(store::unhide) }
+            }
+        }
+    }
+
+    /** Raises [article]'s primary topic one level (Normal, More, Much more). */
+    fun showMore(article: Article) {
+        val topic = article.primaryTopic ?: return
+        var previous: Level? = null
+        changePrefs(
+            "Showing more like this",
+            apply = { p ->
+                previous = p.topicLevels[topic]
+                p.raiseLevel(topic)
+            },
+            undo = { p -> previous?.let { p.setLevel(topic, it) } ?: p.copy(topicLevels = p.topicLevels - topic) },
+        )
+    }
+
+    fun removeOutlet(article: Article) {
+        val outlet = article.outletId
+        changePrefs(
+            "${outletName(article)} won’t appear in your feed",
+            apply = { it.removeOutlet(outlet, graph.clock()) },
+            undo = { it.restoreOutlet(outlet) },
+        )
+    }
+
+    fun muteTopic(topicId: String) {
+        changePrefs(
+            "${topicName(topicId)} won’t appear in your feed",
+            apply = { it.muteTopic(topicId, graph.clock()) },
+            undo = { it.restoreTopic(topicId) },
+        )
+    }
+
+    fun flagPaywall(article: Article) {
+        val outlet = article.outletId
+        changePrefs(
+            "${outletName(article)} marked as paywalled",
+            apply = { it.flagPaywall(outlet, graph.clock()) },
+            undo = { it.unflagPaywall(outlet) },
+        )
+    }
+
+    /** Mutes [keyword] (already validated by the sheet); muting it again keeps one entry. */
+    fun muteKeyword(keyword: String) {
+        val text = keyword.trim()
+        changePrefs(
+            "Muted “$text”",
+            apply = { it.muteKeyword(text, graph.clock()) },
+            undo = { it.unmuteKeyword(text) },
+        )
+    }
+
+    /** True when [topicId] is already at Much more, so Show more like this is disabled. */
+    fun isAtMuchMore(topicId: String): Boolean = prefs.value?.levelOf(topicId) == Level.MUCH_MORE
+
+    /**
+     * Applies [apply] to the stored preferences and shows [text] with Undo. Undo applies [undo]
+     * only when [apply] changed something.
+     */
+    private fun changePrefs(
+        text: String,
+        apply: (UserPrefs) -> UserPrefs,
+        undo: (UserPrefs) -> UserPrefs,
+    ) {
+        viewModelScope.launch {
+            var changed = false
+            graph.preferencesStore.update { p -> apply(p).also { changed = it != p } }
+            showUndo(text) { if (changed) graph.preferencesStore.update(undo) }
+        }
+    }
+
+    /** Shows [text] with "Undo"; the undo runs, then the feed recomposes from the cache. */
+    private fun showUndo(
+        text: String,
+        undo: suspend () -> Unit,
+    ) {
+        showMessage(
+            FeedMessage(
+                text = text,
+                actionLabel = "Undo",
+                onAction = {
+                    viewModelScope.launch {
+                        undo()
+                        graph.feedRepository.invalidate()
+                    }
+                },
+            ),
+        )
     }
 
     fun showMessage(message: FeedMessage) {

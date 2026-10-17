@@ -1,15 +1,25 @@
 package app.newz.testing
 
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ActivityScenario
 import app.newz.AppGraph
 import app.newz.MainActivity
 import app.newz.catalog.Catalog
+import app.newz.store.UserPrefs
 import app.newz.ui.feed.FeedCardInfo
 import app.newz.ui.feed.FeedSemantics
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -85,3 +95,33 @@ fun ComposeTestRule.waitForStableFeed(
     }
     onNodeWithTag(FeedSemantics.LIST_TAG).assertExists()
 }
+
+/** Scrolls to the card headed [title] and opens its card menu with ⋮ ("More actions"). */
+fun ComposeTestRule.openCardMenu(title: String) {
+    val card = hasTestTag(FeedSemantics.CARD_TAG) and hasText(title)
+    onNodeWithTag(FeedSemantics.LIST_TAG).performScrollToNode(card)
+    onNode(hasContentDescription("More actions") and hasAnyAncestor(card)).performClick()
+    waitForText("Hide this article")
+}
+
+/** Taps the sheet row (or button) labelled [label] once it is shown. */
+fun ComposeTestRule.tapText(label: String) {
+    waitForText(label)
+    onNodeWithText(label).performClick()
+}
+
+/** The stored preferences right now. */
+fun currentPrefs(): UserPrefs =
+    runBlocking {
+        AppGraph
+            .get()
+            .preferencesStore.prefs
+            .first()
+    }
+
+/** The server feed index an article link (`/article/<feed>/<item>`) belongs to. */
+fun feedOf(url: String): Int =
+    url
+        .substringAfter("/article/")
+        .substringBefore('/')
+        .toInt()

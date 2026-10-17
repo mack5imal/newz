@@ -164,4 +164,25 @@ class FeedPagerTest {
         assertTrue(rest.any { it.lead.url == fresh.url })
         assertTrue(rest.none { it.lead.id == hidden.id })
     }
+
+    @Test
+    fun droppedGroupThatReturnsGoesBackToItsPlace() {
+        insert(fixture().take(60))
+        val pager = FeedPager(pageSize = 10)
+        pager.reset(ranked())
+        val served = pager.next().groups
+        val hidden = listOf(served[2].lead, served[6].lead)
+        hidden.forEach { store.hide(store.article(it.id)!!, now) }
+        pager.submit(ranked())
+        assertEquals(served - served[2] - served[6], pager.servedGroups)
+
+        hidden.forEach { store.unhide(it.id) }
+        pager.submit(ranked())
+        assertEquals(served, pager.servedGroups)
+        // Once restored, a later merge keeps it in place and serves nothing twice.
+        pager.submit(ranked())
+        assertEquals(served, pager.servedGroups)
+        val rest = pager.drain().flatMap { it.groups }
+        assertTrue(rest.none { g -> served.any { it.lead.id == g.lead.id } })
+    }
 }

@@ -87,7 +87,8 @@ private fun FieldBox(
  * 0 4 0 14, `field` fill, 2 dp `line` border, `radius-control`) with the `type-field` input and a
  * clear [IconButton] ("Clear") once there is text; 6 below, the [helper] at the left and a
  * "{n}/[maxLength]" counter at the right in `type-row-sub`. With an [error], the border, the
- * message (with `icon-warning`) and the counter turn `alert`.
+ * message (with `icon-warning`) and the counter turn `alert`. [fieldModifier] goes on the editable
+ * field itself (for a `FocusRequester`); [counter] replaces the default counter text.
  */
 @Composable
 fun TextField(
@@ -100,6 +101,8 @@ fun TextField(
     maxLength: Int = 60,
     placeholder: String? = null,
     clearLabel: String = "Clear",
+    fieldModifier: Modifier = Modifier,
+    counter: String = "${value.length}/$maxLength",
 ) {
     val c = palette()
     val isError = error != null
@@ -118,6 +121,7 @@ fun TextField(
             description = label,
             placeholder = placeholder,
             clearLabel = clearLabel,
+            modifier = fieldModifier,
         )
         Spacer(Modifier.height(NewzTokens.gapIconLabel))
         Row(horizontalArrangement = Arrangement.spacedBy(NewzTokens.spaceM), verticalAlignment = Alignment.Top) {
@@ -134,7 +138,7 @@ fun TextField(
                 }
             }
             PlainText(
-                text = "${value.length}/$maxLength",
+                text = counter,
                 style = NewzTokens.typeRowSub,
                 color = if (isError) c.alert else c.inkMuted,
             )

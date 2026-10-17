@@ -17,7 +17,8 @@ data class Page(
  * duplicating what was already served: a served group stays in place, updated to the new group
  * that holds its lead, or is dropped when no new group holds it (hidden, muted). New groups
  * that share any article with a served group are left out, and the rest queue up behind the
- * served ones in ranked order.
+ * served ones in ranked order. A dropped group that becomes eligible again (an Undo, or a mute
+ * reversed) goes back to the place it was served at rather than to the end of the queue.
  */
 class FeedPager(
     val pageSize: Int = DEFAULT_PAGE_SIZE,
@@ -29,6 +30,9 @@ class FeedPager(
     private val served = mutableListOf<StoryGroup>()
     private val pending = ArrayDeque<StoryGroup>()
 
+    /** Lead ids of served groups that [submit] dropped, with the position each was served at. */
+    private val dropped = HashMap<String, Int>()
+
     /** The groups served so far, in feed order. */
     val servedGroups: List<StoryGroup> get() = served.toList()
 
@@ -39,6 +43,7 @@ class FeedPager(
     fun reset(ranked: List<StoryGroup>) {
         served.clear()
         pending.clear()
+        dropped.clear()
         pending += ranked.distinctByMembers(emptySet())
     }
 
@@ -49,18 +54,51 @@ class FeedPager(
         val kept = mutableListOf<StoryGroup>()
         val claimed = HashSet<StoryGroup>()
         val keptIds = HashSet<String>()
-        for (old in served) {
-            val new = byMember[old.lead.id] ?: continue
+        for ((index, old) in served.withIndex()) {
+            val new = byMember[old.lead.id]
+            if (new == null) {
+                dropped[old.lead.id] = index
+                continue
+            }
             val next = if (new !in claimed && new.memberIds().none { it in keptIds }) new else old
             if (next.memberIds().any { it in keptIds }) continue
             if (next === new) claimed += new
             kept += next
             keptIds += next.memberIds()
         }
+        restoreDropped(ranked, kept, claimed, keptIds)
         served.clear()
         served += kept
         pending.clear()
         pending += ranked.filter { it !in claimed }.distinctByMembers(keptIds)
+    }
+
+    /** Puts each group in [ranked] that holds a [dropped] lead back at that lead's old position. */
+    private fun restoreDropped(
+        ranked: List<StoryGroup>,
+        kept: MutableList<StoryGroup>,
+        claimed: MutableSet<StoryGroup>,
+        keptIds: MutableSet<String>,
+    ) {
+        if (dropped.isEmpty()) return
+        val returning =
+            ranked
+                .filter { it !in claimed }
+                .mapNotNull { g ->
+                    g
+                        .memberIds()
+                        .mapNotNull { dropped[it] }
+                        .minOrNull()
+                        ?.let { g to it }
+                }.sortedBy { it.second }
+        for ((group, position) in returning) {
+            val ids = group.memberIds()
+            if (ids.any { it in keptIds }) continue
+            kept.add(minOf(position, kept.size), group)
+            claimed += group
+            keptIds += ids
+            ids.forEach { dropped.remove(it) }
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 package app.newz.ui.feed
 
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -105,8 +106,9 @@ private fun FeedCard.info(): FeedCardInfo {
  * The feed (design `feed`): `AppBarMain` with Saved and Settings, then a list whose first item
  * is the `TopicChipRow` (it scrolls away), then `ArticleCard`s, with every drawn state: first
  * load, filter active / empty, end of feed, all filtered, offline with cache and offline empty.
- * Pull to refresh shows the `LoadingBoard` tiles. ⋮ and a long-press call [onOpenCardMenu]
- * (the card menu arrives in a later phase). The Undo `Snackbar` host lives here.
+ * Pull to refresh shows the `LoadingBoard` tiles. ⋮ and a long-press open [CardMenuSheet],
+ * whose Mute a keyword… opens [KeywordMuteSheet]. A card removed by an action collapses out
+ * (`card-collapse`). The Undo `Snackbar` host lives here.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,7 +116,6 @@ fun FeedScreen(
     viewModel: FeedViewModel,
     onOpenSaved: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenCardMenu: (Article) -> Unit = {},
 ) {
     val c = LocalNewzPalette.current
     val context = LocalContext.current
@@ -125,6 +126,8 @@ fun FeedScreen(
     val refreshing by viewModel.refreshing.collectAsState()
     val message by viewModel.message.collectAsState()
     var openGroup by remember { mutableStateOf<StoryGroup?>(null) }
+    var menuCardId by remember { mutableStateOf<String?>(null) }
+    var muteHeadline by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val chips = prefs?.let(viewModel::chips).orEmpty()
 
@@ -177,7 +180,7 @@ fun FeedScreen(
                         onOpenSettings = onOpenSettings,
                         onCard = { viewModel.open(context, it) },
                         onShare = { viewModel.share(context, it) },
-                        onMore = onOpenCardMenu,
+                        onMore = { menuCardId = it.group.lead.id },
                         onGroup = { openGroup = it },
                     )
                 }
@@ -202,6 +205,35 @@ fun FeedScreen(
                 viewModel = viewModel,
                 onOpen = { viewModel.open(context, it) },
                 onDismiss = { openGroup = null },
+            )
+        }
+        val menuCard = menuCardId?.let { id -> (state as? FeedState.Content)?.cards?.find { it.group.lead.id == id } }
+        // The card left the feed (a refresh dropped it): close the menu rather than reopen it later.
+        LaunchedEffect(menuCardId, menuCard == null) { if (menuCard == null) menuCardId = null }
+        menuCard?.let { card ->
+            val article = card.group.lead
+            CardMenuSheet(
+                card = card,
+                viewModel = viewModel,
+                paywallFlagged = prefs?.paywallFlags?.containsKey(article.outletId) == true,
+                actions =
+                    CardMenuActions(
+                        onToggleSaved = { viewModel.toggleSaved(card) },
+                        onHide = { viewModel.hide(card) },
+                        onShowMore = { viewModel.showMore(article) },
+                        onRemoveOutlet = { viewModel.removeOutlet(article) },
+                        onMuteTopic = viewModel::muteTopic,
+                        onMuteKeyword = { muteHeadline = article.title },
+                        onFlagPaywall = { viewModel.flagPaywall(article) },
+                    ),
+                onDismiss = { menuCardId = null },
+            )
+        }
+        muteHeadline?.let { headline ->
+            KeywordMuteSheet(
+                headline = headline,
+                onMute = viewModel::muteKeyword,
+                onDismiss = { muteHeadline = null },
             )
         }
     }
@@ -239,7 +271,7 @@ private fun LazyListScope.feedBody(
     onOpenSettings: () -> Unit,
     onCard: (Article) -> Unit,
     onShare: (Article) -> Unit,
-    onMore: (Article) -> Unit,
+    onMore: (FeedCard) -> Unit,
     onGroup: (StoryGroup) -> Unit,
 ) {
     when (state) {
@@ -274,7 +306,20 @@ private fun LazyListScope.feedBody(
                 item(key = "filter-empty") { FilterEmptyPanel(selectedNames, viewModel::clearFilter) }
             }
             items(state.cards, key = { it.group.lead.id }) { card ->
-                FeedArticleCard(card, viewModel, onCard, onShare, onMore, onGroup)
+                FeedArticleCard(
+                    card = card,
+                    viewModel = viewModel,
+                    onCard = onCard,
+                    onShare = onShare,
+                    onMore = onMore,
+                    onGroup = onGroup,
+                    modifier =
+                        Modifier.animateItem(
+                            fadeInSpec = null,
+                            placementSpec = tween(NewzTokens.cardCollapse),
+                            fadeOutSpec = tween(NewzTokens.cardCollapse),
+                        ),
+                )
             }
             if (state.endReached) {
                 item(key = "end") {
@@ -299,8 +344,9 @@ private fun FeedArticleCard(
     viewModel: FeedViewModel,
     onCard: (Article) -> Unit,
     onShare: (Article) -> Unit,
-    onMore: (Article) -> Unit,
+    onMore: (FeedCard) -> Unit,
     onGroup: (StoryGroup) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val lead = card.group.lead
     val info = card.info()
@@ -313,12 +359,12 @@ private fun FeedArticleCard(
         topic = viewModel.topicName(lead.primaryTopic),
         onOpen = { onCard(lead) },
         onShare = { onShare(lead) },
-        onMore = { onMore(lead) },
-        onLongPress = { onMore(lead) },
+        onMore = { onMore(card) },
+        onLongPress = { onMore(card) },
         groupCount = card.group.othersCount,
         onGroup = { onGroup(card.group) },
         modifier =
-            Modifier
+            modifier
                 .padding(start = NewzTokens.spaceM, end = NewzTokens.spaceM, bottom = NewzTokens.spaceCardGap)
                 .testTag(FeedSemantics.CARD_TAG)
                 .semantics { feedCard = info },
