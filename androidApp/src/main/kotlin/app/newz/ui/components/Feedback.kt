@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,8 +38,8 @@ import app.newz.ui.theme.SignageText
 import kotlinx.coroutines.delay
 
 /**
- * `Snackbar` — the Undo bar: it floats 12 from the sides and 24 from the bottom (place it at the
- * bottom of the screen), min height 60, padding 6 6 6 16, gap 12, `snackbar` background,
+ * `Snackbar` — the Undo bar: it floats 12 from the sides and 24 above the navigation bar (place
+ * it at the bottom of the screen; the app draws edge to edge), min height 60, padding 6 6 6 16, gap 12, `snackbar` background,
  * `type-message` in `on-snackbar`, `radius-control`, `shadow-snackbar`, and a [SnackbarAction]
  * only when [actionLabel] is non-null (a plain confirmation such as "Reading history cleared" has none).
  * When [onTimeout] is set it is called after `snackbar-timeout`. The timer restarts whenever
@@ -67,6 +68,7 @@ fun Snackbar(
         modifier =
             modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
                 .padding(start = NewzTokens.spaceM, end = NewzTokens.spaceM, bottom = NewzTokens.snackbarBottom)
                 .dropShadow(
                     shape = ControlShape,

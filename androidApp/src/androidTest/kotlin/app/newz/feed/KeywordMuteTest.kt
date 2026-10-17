@@ -95,7 +95,7 @@ class KeywordMuteTest {
         muteButton().performClick()
 
         compose.waitUntil(TIMEOUT) { compose.servedCards().none(::mentions) }
-        compose.onNodeWithText("Muted “Antarctica”").assertIsDisplayed()
+        compose.onNodeWithText("Muted “Antarctica”. Unmute it in Settings › Topics & keywords.").assertIsDisplayed()
         compose.onNodeWithText("Undo").assertIsDisplayed()
         assertEquals(listOf("Antarctica"), currentPrefs().mutedKeywords.map { it.text })
 
@@ -108,7 +108,7 @@ class KeywordMuteTest {
         openKeywordSheet(other.title)
         field().performTextInput(" antarctica ")
         muteButton().performClick()
-        compose.waitForText("Muted “antarctica”")
+        compose.waitForText("Muted “antarctica”. Unmute it in Settings › Topics & keywords.")
         assertEquals(1, currentPrefs().mutedKeywords.size)
 
         scenario!!.recreate()

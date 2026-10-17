@@ -43,7 +43,7 @@ data class TopicChipItem(
     val label: String,
 )
 
-/** The feed's one-line message bar (the Undo `Snackbar`); [key] restarts its timer. */
+/** The feed's message bar (the Undo `Snackbar`); [key] restarts its timer. */
 data class FeedMessage(
     val text: String,
     val actionLabel: String? = null,
@@ -179,7 +179,7 @@ class FeedViewModel(
                         store.listSaved().find { it.article.id == id }?.also { store.unsave(id) }
                     }
                 graph.feedRepository.invalidate()
-                showUndo("Removed from saved") {
+                showUndo("Removed from Saved.") {
                     if (saved != null) withContext(Dispatchers.IO) { store.save(saved.article, saved.savedAt) }
                 }
             } else {
@@ -187,7 +187,7 @@ class FeedViewModel(
                 val wasSaved =
                     withContext(Dispatchers.IO) { store.isSaved(id).also { store.save(stored, graph.clock()) } }
                 graph.feedRepository.invalidate()
-                showUndo("Saved for later") {
+                showUndo("Saved for later. Find it in Saved.") {
                     if (!wasSaved) withContext(Dispatchers.IO) { store.unsave(id) }
                 }
             }
@@ -210,7 +210,7 @@ class FeedViewModel(
                         .map { it.id }
                 }
             graph.feedRepository.invalidate()
-            showUndo("Article hidden") {
+            showUndo("Article hidden. Bring it back in Settings › Hidden articles.") {
                 withContext(Dispatchers.IO) { added.forEach(store::unhide) }
             }
         }
@@ -233,7 +233,7 @@ class FeedViewModel(
     fun removeOutlet(article: Article) {
         val outlet = article.outletId
         changePrefs(
-            "${outletName(article)} won’t appear in your feed",
+            "${outletName(article)} won’t appear. Bring it back in Settings › Sources.",
             apply = { it.removeOutlet(outlet, graph.clock()) },
             undo = { it.restoreOutlet(outlet) },
         )
@@ -241,7 +241,7 @@ class FeedViewModel(
 
     fun muteTopic(topicId: String) {
         changePrefs(
-            "${topicName(topicId)} won’t appear in your feed",
+            "${topicName(topicId)} won’t appear. Bring it back in Settings › Topics & keywords.",
             apply = { it.muteTopic(topicId, graph.clock()) },
             undo = { it.restoreTopic(topicId) },
         )
@@ -250,7 +250,7 @@ class FeedViewModel(
     fun flagPaywall(article: Article) {
         val outlet = article.outletId
         changePrefs(
-            "${outletName(article)} marked as paywalled",
+            "${outletName(article)} marked as paywalled. Change it in Settings › Sources.",
             apply = { it.flagPaywall(outlet, graph.clock()) },
             undo = { it.unflagPaywall(outlet) },
         )
@@ -260,7 +260,7 @@ class FeedViewModel(
     fun muteKeyword(keyword: String) {
         val text = keyword.trim()
         changePrefs(
-            "Muted “$text”",
+            "Muted “$text”. Unmute it in Settings › Topics & keywords.",
             apply = { it.muteKeyword(text, graph.clock()) },
             undo = { it.unmuteKeyword(text) },
         )

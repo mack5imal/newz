@@ -150,7 +150,7 @@ class HiddenSavedTest {
         assertEquals(1, compose.onAllNodes(hasText(title)).fetchSemanticsNodes().size)
 
         compose.onNode(hasContentDescription("Unsave") and hasAnyAncestor(card)).performClick()
-        compose.waitForText("Removed from saved")
+        compose.waitForText("Removed from Saved.")
         compose.waitForText("Nothing saved yet")
         assertTrue(compose.onAllNodes(card).fetchSemanticsNodes().isEmpty())
         assertTrue(store.listSaved().isEmpty())

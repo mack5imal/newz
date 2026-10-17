@@ -260,7 +260,7 @@ Each entry gives what the component is, where it appears, and its exact measurem
 - `CardActions` — the bottom row of `ArticleCard`: 64 tall, padding 0 4 0 12, with a `GroupButton` at the left on grouped cards only and Share and ⋮ `IconButton`s at the right.
 - `GroupButton` — "+n sources" on grouped cards: 48 tall, padding 0 14, a trailing 20 dp `icon-arrow-right` with gap 10, `type-button`, `radius-control`; light uses a `navy` fill with `sky` text, dark is transparent with a 2 dp `sky` border, padding 0 12.
 - `Button` — every text button: 48 tall, padding 0 20, an optional leading 20 dp icon with gap 8, `type-button`, `radius-control` and a 2 dp border; Primary is `button`/`on-button`, Outline has a `line` border with `ink` text, Text has no visible border with `ink` text and padding 0 12, Disabled is `disabled`/`on-disabled`, and Wide is full width.
-- `Snackbar` — the Undo bar (`feed--undo`, `card-menu--confirmation` and every "(not drawn)" confirmation in Copy): it floats 12 from the sides and 24 from the bottom, min height 60, padding 6 6 6 16, gap 12, with a `snackbar` background, `type-message` in `on-snackbar`, `radius-control`, `shadow-snackbar` and a `SnackbarAction`; it lasts for `snackbar-timeout`.
+- `Snackbar` — the Undo bar (`feed--undo`, `card-menu--confirmation` and every "(not drawn)" confirmation in Copy): it floats 12 from the sides and 24 above the navigation bar, min height 60, padding 6 6 6 16, gap 12, with a `snackbar` background, `type-message` in `on-snackbar`, `radius-control`, `shadow-snackbar` and a `SnackbarAction`; it lasts for `snackbar-timeout`.
 - `SnackbarAction` — "Undo" or "Retry" inside `Snackbar` and `OfflineBanner`: 48 tall, padding 0 14, a 2 dp border in the text colour, `type-button` at 18.
 - `OfflineBanner` — the offline notice on `feed--offline-saved` and `saved--offline`: a band with 12 side margins, margin-bottom 14, padding 6 6 6 14 and gap 12; it has a `strip` background, a 22 dp `icon-wifi-off`, the message in 600 15/20 and a `SnackbarAction` "Retry", all in `sky`.
 - `StatePanel` — every empty, error and info panel (feed filter-empty, all-filtered and offline-empty, the empty states, search no-feed and not-address): a `card` block with margin 4 12 14 (so it sits 18 below the app bar) and padding 28 20 24; it holds an optional 40 dp icon in `ink` (in `alert` for errors) with 16 below, a `type-state-title`, `type-body` in `ink-muted` with 10 above, and an optional `Button` with 20 above.
@@ -323,7 +323,7 @@ States:
   - A `StatePanel` shows "No {topic} articles right now", body text, and a Primary "Clear filter".
 - `--undo`:
   - After Hide this article, the card collapses (`card-collapse`).
-  - A `Snackbar` "Article hidden" with "Undo" appears for 6 s. Undo puts the card back in place.
+  - A `Snackbar` "Article hidden. Bring it back in Settings › Hidden articles." with "Undo" appears for 6 s. Undo puts the card back in place.
 - `--end`:
   - After the last article, a `BoardPanel` shows tiles spelling "END", "You're all caught up", and body text.
   - The app bar stays pinned.
@@ -365,7 +365,7 @@ States:
 - `card-menu.png` — normal.
 - `--saved` — row 1 reads "Unsave", with a filled icon.
 - `--much-more` — the article's topic is already at Much more. Row 3 becomes the disabled `SheetActionRow`, with "Already showing much more of {topic}" under the label.
-- `--confirmation` — after "Don't show content from The Harbor Ledger": the sheet has closed, that outlet's cards are gone, and the snackbar reads "The Harbor Ledger won’t appear in your feed" with "Undo".
+- `--confirmation` — after "Don't show content from The Harbor Ledger": the sheet has closed, that outlet's cards are gone, and the snackbar reads "The Harbor Ledger won’t appear. Bring it back in Settings › Sources." with "Undo".
 - `--dark`.
 
 ### keyword-mute — Mute a keyword
@@ -519,7 +519,7 @@ Layout: `AppBarSub` "Saved", then a list of `SavedCard`s (12 margins, 14 gaps), 
 Behaviour:
 - Tapping a card opens the article.
 - Share opens the share sheet.
-- Unsave (filled bookmark) removes the card and shows a `Snackbar` "Removed from saved" with "Undo".
+- Unsave (filled bookmark) removes the card and shows a `Snackbar` "Removed from Saved." with "Undo".
 - Saved articles stay saved past the 7-day feed window until they're unsaved.
 
 States:
@@ -664,7 +664,7 @@ Strings are exact. Signage-styled text (see `font-signage`) displays in capitals
 - `Clear filter`
 - `No {topic} articles right now` (e.g. `Health`; several selected: `Health or Space`)
 - `New {topic} stories from your sources will show up here as soon as they’re published.`
-- `Article hidden`
+- `Article hidden. Bring it back in Settings › Hidden articles.`
 - `Undo`
 - `END`
 - `You're all caught up`
@@ -690,13 +690,13 @@ Strings are exact. Signage-styled text (see `font-signage`) displays in capitals
 - `Don't show {topic}` (e.g. `Science`)
 - `Mute a keyword…`
 - `Mark {outlet} as paywalled`
-- `Saved for later` (snackbar after Save for later; not drawn)
-- `Removed from saved` (snackbar after Unsave; not drawn)
-- `Article hidden`
+- `Saved for later. Find it in Saved.` (snackbar after Save for later; not drawn)
+- `Removed from Saved.` (snackbar after Unsave; not drawn)
+- `Article hidden. Bring it back in Settings › Hidden articles.`
 - `Showing more like this` (snackbar; not drawn)
-- `{outlet} won’t appear in your feed` (e.g. `The Harbor Ledger`)
-- `{topic} won’t appear in your feed` (e.g. `Science`; not drawn)
-- `{outlet} marked as paywalled` (snackbar; not drawn)
+- `{outlet} won’t appear. Bring it back in Settings › Sources.` (e.g. `The Harbor Ledger`)
+- `{topic} won’t appear. Bring it back in Settings › Topics & keywords.` (e.g. `Science`; not drawn)
+- `{outlet} marked as paywalled. Change it in Settings › Sources.` (snackbar; not drawn)
 - `Undo`
 
 ### keyword-mute
@@ -713,7 +713,7 @@ Strings are exact. Signage-styled text (see `font-signage`) displays in capitals
 - `Keep it to 60 characters or fewer`
 - `Cancel`
 - `Mute`
-- `Muted “{keyword}”` (e.g. `Antarctica`; snackbar; not drawn)
+- `Muted “{keyword}”. Unmute it in Settings › Topics & keywords.` (e.g. `Antarctica`; snackbar; not drawn)
 - `Undo`
 
 ### story-group
@@ -862,7 +862,7 @@ Strings are exact. Signage-styled text (see `font-signage`) displays in capitals
 - `{topic}` (e.g. `Tech`, shown when an article has no image)
 - `Share` (spoken)
 - `Unsave` (spoken)
-- `Removed from saved` (snackbar; not drawn)
+- `Removed from Saved.` (snackbar; not drawn)
 - `Undo`
 - `Nothing saved yet`
 - `Tap ⋮ on any article and choose Save for later. Your saved list stays on this phone.`

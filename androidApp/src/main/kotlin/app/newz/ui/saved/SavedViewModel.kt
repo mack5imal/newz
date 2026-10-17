@@ -26,7 +26,7 @@ import kotlinx.coroutines.withContext
 /**
  * The Saved list (design `saved`, SPEC S21): every saved article from the store, newest saved
  * first. Saved rows are full copies, so the list works offline and outlives the 7-day feed window.
- * Unsave shows "Removed from saved" with Undo, which puts the row back with its save time.
+ * Unsave shows "Removed from Saved." with Undo, which puts the row back with its save time.
  */
 class SavedViewModel(
     private val graph: AppGraph,
@@ -93,7 +93,7 @@ class SavedViewModel(
             graph.feedRepository.invalidate()
             messageState.value =
                 FeedMessage(
-                    text = "Removed from saved",
+                    text = "Removed from Saved.",
                     actionLabel = "Undo",
                     onAction = {
                         viewModelScope.launch {

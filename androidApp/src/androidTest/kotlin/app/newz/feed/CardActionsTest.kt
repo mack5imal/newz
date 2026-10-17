@@ -107,7 +107,7 @@ class CardActionsTest {
         compose.tapText("Hide this article")
         waitUntilServed("hidden card leaves the feed") { cards -> cards.none { it.id == target.id } }
         compose.waitUntil(TIMEOUT) { cardGone(title) }
-        compose.onNodeWithText("Article hidden").assertIsDisplayed()
+        compose.onNodeWithText("Article hidden. Bring it back in Settings › Hidden articles.").assertIsDisplayed()
         compose.onNodeWithText("Undo").assertIsDisplayed()
 
         compose.onNodeWithText("Undo").performClick()
@@ -203,7 +203,7 @@ class CardActionsTest {
         compose.openCardMenu(titleOf(target))
         compose.tapText("Don't show content from Outlet 0")
         waitUntilServed("no card from either section") { cards -> cards.none { feedOf(it.url) in outletFeeds } }
-        compose.onNodeWithText("Outlet 0 won’t appear in your feed").assertIsDisplayed()
+        compose.onNodeWithText("Outlet 0 won’t appear. Bring it back in Settings › Sources.").assertIsDisplayed()
         assertTrue(TestCatalog.outletId(0) in currentPrefs().removedOutlets)
 
         compose.onNodeWithText("Undo").performClick()
@@ -229,7 +229,10 @@ class CardActionsTest {
         compose.openCardMenu(titleOf(target))
         compose.tapText("Don't show Science")
         waitUntilServed("no Science card") { cards -> cards.none { TestCatalog.SCIENCE in it.topics } }
-        compose.onNodeWithText("Science won’t appear in your feed").assertIsDisplayed()
+        compose
+            .onNodeWithText(
+                "Science won’t appear. Bring it back in Settings › Topics & keywords.",
+            ).assertIsDisplayed()
         assertTrue(TestCatalog.SCIENCE in currentPrefs().mutedTopics)
 
         recreate()
@@ -272,7 +275,7 @@ class CardActionsTest {
         compose.openCardMenu(titleOf(target))
         compose.tapText("Mark Outlet 2 as paywalled")
         waitUntilServed("no Outlet 2 card") { cards -> cards.none { feedOf(it.url) == 2 } }
-        compose.onNodeWithText("Outlet 2 marked as paywalled").assertIsDisplayed()
+        compose.onNodeWithText("Outlet 2 marked as paywalled. Change it in Settings › Sources.").assertIsDisplayed()
         assertTrue(TestCatalog.outletId(2) in currentPrefs().paywallFlags)
         recreate()
         assertTrue("absent after recreation", compose.servedCards().none { feedOf(it.url) == 2 })
@@ -298,7 +301,7 @@ class CardActionsTest {
         compose.openCardMenu(title)
         compose.tapText("Save for later")
         compose.waitUntil(TIMEOUT) { store.listSaved().isNotEmpty() }
-        compose.onNodeWithText("Saved for later").assertIsDisplayed()
+        compose.onNodeWithText("Saved for later. Find it in Saved.").assertIsDisplayed()
         assertEquals(listOf(target.id), store.listSaved().map { it.article.id })
         // Saving the same article again keeps one row.
         store.save(store.article(target.id)!!)
@@ -306,12 +309,14 @@ class CardActionsTest {
 
         val savedAt = store.listSaved().single().savedAt
 
-        compose.waitUntil(TIMEOUT) { compose.onAllNodesWithText("Saved for later").fetchSemanticsNodes().isEmpty() }
+        compose.waitUntil(TIMEOUT) {
+            compose.onAllNodesWithText("Saved for later. Find it in Saved.").fetchSemanticsNodes().isEmpty()
+        }
         compose.openCardMenu(title)
         compose.onNodeWithText("Unsave").assertIsDisplayed()
         compose.tapText("Unsave")
         compose.waitUntil(TIMEOUT) { store.listSaved().isEmpty() }
-        compose.onNodeWithText("Removed from saved").assertIsDisplayed()
+        compose.onNodeWithText("Removed from Saved.").assertIsDisplayed()
         compose.onNodeWithText("Undo").performClick()
         compose.waitUntil(TIMEOUT) { store.listSaved().size == 1 }
         // Undo restores the saved row exactly, keeping its original save time.
