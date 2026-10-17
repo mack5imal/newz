@@ -18,6 +18,7 @@ import app.newz.platform.ShareLauncher
 import app.newz.store.ArticleStore
 import app.newz.store.NewzStorage
 import app.newz.store.PreferencesStore
+import app.newz.store.ThemeMode
 import app.newz.ui.image.NewzImageLoader
 import coil3.ImageLoader
 import io.ktor.client.HttpClient
@@ -25,6 +26,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import java.io.File
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -110,7 +115,11 @@ class AppGraph private constructor(
     val articleStore: ArticleStore = ArticleStore(sqlDriver)
     val preferencesStore: PreferencesStore get() = preferences(config.prefsFileName)
     val imageLoader: ImageLoader get() = NewzImageLoader.get(appContext)
-    val articleOpener: ArticleOpener = ArticleOpener(config.customTabsProvider)
+    val articleOpener: ArticleOpener = ArticleOpener(config.customTabsProvider, theme = { themeMode.value })
+
+    /** The user's Theme setting, read from the start and kept current for the Custom Tab colours. */
+    private val themeMode: StateFlow<ThemeMode> =
+        preferencesStore.prefs.map { it.theme }.stateIn(scope, SharingStarted.Eagerly, ThemeMode.SYSTEM)
     val shareLauncher: ShareLauncher = ShareLauncher()
 
     /** The one guarded HTTP client the feed engine, search's address check and [pageImages] share. */

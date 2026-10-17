@@ -2,6 +2,8 @@ package app.newz.settings
 
 import android.app.Activity
 import android.app.Instrumentation.ActivityResult
+import android.content.res.Configuration
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -10,6 +12,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -24,6 +27,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.core.view.WindowCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.intent.Intents
 import androidx.test.espresso.intent.Intents.intending
@@ -36,6 +40,7 @@ import app.newz.catalog.Catalog
 import app.newz.catalog.PaywallStatus
 import app.newz.store.MutedKeyword
 import app.newz.store.TextSize
+import app.newz.store.ThemeMode
 import app.newz.testing.MockFeedServer
 import app.newz.testing.TestApp
 import app.newz.testing.TestCatalog
@@ -289,6 +294,61 @@ class SettingsControlsTest {
     }
 
     @Test
+    fun themeDefaultsToSystemAndDarkOrLightApplyAtOnce() {
+        server.fill(itemsPerFeed = 3)
+        start()
+        assertEquals(ThemeMode.SYSTEM, currentPrefs().theme)
+        val systemDark =
+            (
+                InstrumentationRegistry
+                    .getInstrumentation()
+                    .targetContext.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+            ) == Configuration.UI_MODE_NIGHT_YES
+
+        openSettings()
+        compose.onNode(hasText("System") and hasClickAction()).performScrollTo().assertIsSelected()
+        assertEquals(if (systemDark) DARK_INK else LIGHT_INK, textColour("Theme"))
+
+        compose.onNode(hasText("Dark") and hasClickAction()).performClick()
+        compose.waitUntil(TIMEOUT) { currentPrefs().theme == ThemeMode.DARK }
+        compose.waitUntil(TIMEOUT) { textColour("Theme") == DARK_INK }
+        compose.onNode(hasText("Dark") and hasClickAction()).assertIsSelected()
+        assertTrue("dark: light navigation-bar icons", !lightNavigationBarIcons())
+
+        compose.onNode(hasText("Light") and hasClickAction()).performClick()
+        compose.waitUntil(TIMEOUT) { currentPrefs().theme == ThemeMode.LIGHT }
+        compose.waitUntil(TIMEOUT) { textColour("Theme") == LIGHT_INK }
+        assertTrue("light: dark navigation-bar icons", lightNavigationBarIcons())
+
+        compose.onNode(hasText("System") and hasClickAction()).performClick()
+        compose.waitUntil(TIMEOUT) { currentPrefs().theme == ThemeMode.SYSTEM }
+    }
+
+    /** The colour [text] is drawn in (its first match). */
+    private fun textColour(text: String): Long {
+        val node = compose.onAllNodes(hasText(text), useUnmergedTree = true).fetchSemanticsNodes().first()
+        val layouts = mutableListOf<TextLayoutResult>()
+        node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+        return layouts
+            .single()
+            .layoutInput.style.color
+            .toArgb()
+            .toLong() and 0xFFFFFFFFL
+    }
+
+    private fun lightNavigationBarIcons(): Boolean {
+        compose.waitForIdle()
+        var light = false
+        scenario?.onActivity { activity ->
+            light =
+                WindowCompat
+                    .getInsetsController(activity.window, activity.window.decorView)
+                    .isAppearanceLightNavigationBars
+        }
+        return light
+    }
+
+    @Test
     fun extraLargeTextMakesFeedHeadlinesLarger() {
         server.fill(itemsPerFeed = 3)
         start()
@@ -438,6 +498,8 @@ class SettingsControlsTest {
             config.getOrNull(SemanticsProperties.Text).orEmpty().joinToString(" ")
 
     private companion object {
+        const val LIGHT_INK = 0xFF1D3A5FL
+        const val DARK_INK = 0xFFF3F6FBL
         const val TIMEOUT = 10_000L
         const val SETTLE_MS = 1_000L
         const val HARBOR = "The Harbor Ledger"

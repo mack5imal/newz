@@ -61,6 +61,7 @@ class BackupCodecTest {
             zip = "02134",
             localMetroId = "boston",
             betterPictures = true,
+            theme = ThemeMode.DARK,
         )
 
     private fun article(n: Int) =
@@ -113,6 +114,22 @@ class BackupCodecTest {
             assertEquals(fullPrefs, restoredPrefs)
             assertEquals("02134", restoredPrefs.zip)
             assertTrue(restoredPrefs.betterPictures)
+            assertEquals(ThemeMode.DARK, restoredPrefs.theme)
+        }
+
+    @Test
+    fun backupAndPrefsWrittenBeforeThemeReadItAsSystem() =
+        runTest {
+            val json = populated().export(includeHistory = false)
+            assertTrue(json.contains("\"theme\": \"DARK\""))
+            val old = json.replace(Regex(",\\s*\"theme\": \"DARK\""), "")
+            assertFalse(old.contains("\"theme\""))
+            assertEquals(fullPrefs.copy(theme = ThemeMode.SYSTEM), BackupCodec.import(old).getOrThrow().prefs)
+
+            val oldPrefs = PreferencesStore.encode(fullPrefs).replace(Regex(",\\s*\"theme\":\"DARK\""), "")
+            assertFalse(oldPrefs.contains("\"theme\""))
+            assertEquals(fullPrefs.copy(theme = ThemeMode.SYSTEM), PreferencesStore.decode(oldPrefs))
+            assertEquals(ThemeMode.SYSTEM, UserPrefs().theme)
         }
 
     @Test
@@ -120,12 +137,12 @@ class BackupCodecTest {
         runTest {
             val json = populated().export(includeHistory = false)
             assertTrue(json.contains("\"betterPictures\": true"))
-            val old = json.replace(Regex(",\\s*\"betterPictures\": true"), "")
+            val old = json.replace(Regex("\"betterPictures\": true,?\\s*"), "")
             assertFalse(old.contains("betterPictures"))
             val contents = BackupCodec.import(old).getOrThrow()
             assertEquals(fullPrefs.copy(betterPictures = false), contents.prefs)
 
-            val oldPrefs = PreferencesStore.encode(fullPrefs).replace(Regex(",\\s*\"betterPictures\":true"), "")
+            val oldPrefs = PreferencesStore.encode(fullPrefs).replace(Regex("\"betterPictures\":true,?"), "")
             assertFalse(oldPrefs.contains("betterPictures"))
             assertEquals(fullPrefs.copy(betterPictures = false), PreferencesStore.decode(oldPrefs))
         }

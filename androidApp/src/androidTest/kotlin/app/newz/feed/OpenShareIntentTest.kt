@@ -5,6 +5,7 @@ import android.app.Instrumentation.ActivityResult
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
@@ -19,6 +20,7 @@ import androidx.test.espresso.intent.matcher.IntentMatchers.hasData
 import androidx.test.espresso.intent.matcher.IntentMatchers.isInternal
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.newz.MainActivity
+import app.newz.store.ThemeMode
 import app.newz.testing.MockFeedServer
 import app.newz.testing.TestApp
 import app.newz.testing.TestCatalog
@@ -64,10 +66,13 @@ class OpenShareIntentTest {
         server.close()
     }
 
-    private fun launchFeed(customTabsProvider: () -> String?) {
+    private fun launchFeed(
+        theme: ThemeMode = ThemeMode.SYSTEM,
+        customTabsProvider: () -> String?,
+    ) {
         server.fill(itemsPerFeed = 2)
         TestApp.install(TestCatalog.build(server), customTabsProvider = customTabsProvider)
-        TestPrefs.onboarded()
+        TestPrefs.write(TestPrefs.onboarded().copy(theme = theme))
         scenario = TestApp.launch()
         compose.waitForStableFeed(minCards = 8)
     }
@@ -94,6 +99,16 @@ class OpenShareIntentTest {
         assertNull(view.component)
         assertEquals(url, view.dataString)
         assertTrue("a Custom Tabs intent", view.hasExtra(CUSTOM_TABS_SESSION))
+        // Theme System: the tab follows the phone's light or dark setting.
+        assertEquals(CustomTabsIntent.COLOR_SCHEME_SYSTEM, view.getIntExtra(CustomTabsIntent.EXTRA_COLOR_SCHEME, -1))
+    }
+
+    @Test
+    fun theCustomTabFollowsTheThemeSetting() {
+        launchFeed(theme = ThemeMode.DARK) { "org.example.browser" }
+        tapFirstCard()
+        val view = Intents.getIntents().last { it.action == Intent.ACTION_VIEW }
+        assertEquals(CustomTabsIntent.COLOR_SCHEME_DARK, view.getIntExtra(CustomTabsIntent.EXTRA_COLOR_SCHEME, -1))
     }
 
     @Test

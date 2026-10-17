@@ -14,6 +14,7 @@ import app.newz.store.CustomFeed
 import app.newz.store.HiddenArticle
 import app.newz.store.Level
 import app.newz.store.TextSize
+import app.newz.store.ThemeMode
 import app.newz.store.UserPrefs
 import app.newz.store.clearZip
 import app.newz.store.labelWithMeaning
@@ -152,6 +153,8 @@ class SettingsViewModel(
     fun setBetterPictures(on: Boolean) = update { it.copy(betterPictures = on) }
 
     fun setTextSize(size: TextSize) = update { it.copy(textSize = size) }
+
+    fun setTheme(theme: ThemeMode) = update { it.copy(theme = theme) }
 
     /** Clears every reading-history row at once; there is no Undo. */
     fun clearHistory() {

@@ -8,6 +8,7 @@ import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.net.toUri
 import app.newz.net.WebUrl
+import app.newz.store.ThemeMode
 import app.newz.ui.theme.NewzColors
 
 /**
@@ -19,9 +20,11 @@ import app.newz.ui.theme.NewzColors
  *
  * [customTabsProvider] answers whether the default browser offers Custom Tabs (the production
  * graph asks `CustomTabsClient.getPackageName` with an empty package list); tests inject it.
+ * [theme] is the user's Theme setting: the Custom Tab uses the same light or dark colours (B16).
  */
 class ArticleOpener(
     private val customTabsProvider: () -> String?,
+    private val theme: () -> ThemeMode = { ThemeMode.SYSTEM },
 ) {
     /** Returns false when [url] is not an http(s) link or no app on the device can open it. */
     fun open(
@@ -50,6 +53,17 @@ class ArticleOpener(
             .setShowTitle(true)
             .setDefaultColorSchemeParams(light)
             .setColorSchemeParams(CustomTabsIntent.COLOR_SCHEME_DARK, dark)
+            .setColorScheme(colorSchemeOf(theme()))
             .build()
+    }
+
+    companion object {
+        /** The Custom Tabs colour scheme for the user's Theme setting. */
+        fun colorSchemeOf(theme: ThemeMode): Int =
+            when (theme) {
+                ThemeMode.SYSTEM -> CustomTabsIntent.COLOR_SCHEME_SYSTEM
+                ThemeMode.LIGHT -> CustomTabsIntent.COLOR_SCHEME_LIGHT
+                ThemeMode.DARK -> CustomTabsIntent.COLOR_SCHEME_DARK
+            }
     }
 }

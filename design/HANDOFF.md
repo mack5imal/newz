@@ -239,6 +239,7 @@ How to draw them:
 | `icon-compass` | `<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>` | Suggestions row and empty state |
 | `icon-clock` | `<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>` | Reading history row |
 | `icon-image` | `<path d="M3.5 5h17v14h-17z"/><circle cx="9" cy="10" r="2"/><path d="M20.5 15l-5-5-9.5 9"/>` | Better pictures row (not drawn) |
+| `icon-theme` | `<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>` | Theme row (B16; not drawn) |
 | `icon-text-size` | `<path d="M4 18L9 6l5 12M5.8 14h6.4M15 18l3-7 3 7M15.9 16h4.2"/>` | Text size row |
 | `icon-download` | `<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>` | Export, Backup & restore row |
 | `icon-upload` | `<path d="M12 15V4M7 9l5-5 5 5M5 20h14"/>` | Choose a backup file |
@@ -449,6 +450,7 @@ Reading:
 - Reading history — `Switch`. Turning it off stops recording but doesn't clear what's stored.
 - "Clear reading history" — Outline `Button` in the `compact` size, centred in its row (B13). Opens a `ConfirmSheet` (a `BottomSheet` with the title, the message in `type-intro` `ink-muted`, and Cancel (Text) / "Clear history" (Primary) at the right, as on the zip code sheet); "Clear history" clears and shows a `Snackbar` "Reading history cleared" with no Undo.
 - Better pictures from article pages — `Switch` (icon `icon-image`), off by default, below "Clear reading history". When on, a card whose feed picture is missing or tiny reads the start of the article's page for a better one (see `ArticleImage`). Not drawn.
+- Theme — row title with `icon-theme`, then a full-width `SegmentedControl` (System / Light / Dark), above Text size (B16). System (the default; older preferences and backups read as System) follows the phone; Light and Dark apply at once, including the status- and navigation-bar icons and the colours of the browser tab articles open in. Included in backups. Not drawn.
 - Text size — row title with an icon, then a full-width `SegmentedControl` (Small / Default / Large / Extra large). Applies immediately; see Text size.
 
 Your data:
@@ -802,6 +804,10 @@ Strings are exact. Signage-styled text (see `font-signage`) displays in capitals
 - `Reading history cleared` (snackbar, no Undo; not drawn)
 - `Better pictures from article pages` (not drawn)
 - `When a feed’s picture is missing or tiny, read the start of the article’s page to find a better one.` (not drawn)
+- `Theme` (not drawn)
+- `System` (not drawn)
+- `Light` (not drawn)
+- `Dark` (not drawn)
 - `Text size`
 - `Small`
 - `Default`

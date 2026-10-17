@@ -7,6 +7,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -16,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.newz.store.TextSize
+import app.newz.store.ThemeMode
 import app.newz.store.UserPrefs
 import app.newz.ui.feed.FeedScreen
 import app.newz.ui.feed.FeedViewModel
@@ -51,11 +53,20 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** The app shell: theme from the user's text size, then the back stack once preferences are read. */
+/**
+ * The app shell: the theme from the user's Theme and Text size settings (System follows the phone),
+ * then the back stack once preferences are read.
+ */
 @Composable
 fun NewzApp(graph: AppGraph = remember { AppGraph.get() }) {
     val prefs by graph.preferencesStore.prefs.collectAsState(initial = null)
-    NewzTheme(textSize = prefs?.textSize ?: TextSize.DEFAULT) {
+    val dark =
+        when (prefs?.theme ?: ThemeMode.SYSTEM) {
+            ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            ThemeMode.LIGHT -> false
+            ThemeMode.DARK -> true
+        }
+    NewzTheme(darkTheme = dark, textSize = prefs?.textSize ?: TextSize.DEFAULT) {
         Box(Modifier.fillMaxSize().background(LocalNewzPalette.current.paper)) {
             prefs?.let { NewzNavigation(graph, it) }
         }

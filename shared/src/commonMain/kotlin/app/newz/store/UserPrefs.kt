@@ -51,6 +51,9 @@ fun Level.caption(topic: String): String =
 /** Article text size. */
 enum class TextSize { SMALL, DEFAULT, LARGE, EXTRA_LARGE }
 
+/** Light or dark colours: [SYSTEM] follows the phone's setting (B16). */
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
 /** A muted keyword. [text] is trimmed; uniqueness is case-insensitive. */
 @Serializable
 data class MutedKeyword(
@@ -70,6 +73,8 @@ data class MutedKeyword(
  * - [betterPictures] (off by default) lets the feed read the start of an article's page for its
  *   picture when the feed's own is missing or tiny (B5). Preferences and backups written before it
  *   existed read as off.
+ * - [theme] picks light or dark colours, or follows the phone ([ThemeMode.SYSTEM], the default;
+ *   preferences and backups written before it existed read as System).
  */
 @Serializable
 data class UserPrefs(
@@ -88,4 +93,5 @@ data class UserPrefs(
     val zip: String? = null,
     val localMetroId: String? = null,
     val betterPictures: Boolean = false,
+    val theme: ThemeMode = ThemeMode.SYSTEM,
 )

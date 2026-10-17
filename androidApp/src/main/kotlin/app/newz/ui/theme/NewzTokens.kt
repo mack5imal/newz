@@ -538,6 +538,7 @@ object NewzIcons {
     val iconCompass by lazy { lineIcon("compass", circle(12f, 12f, 9f), "M15.5 8.5l-2 5-5 2 2-5z") }
     val iconClock by lazy { lineIcon("clock", circle(12f, 12f, 9f), "M12 7v5l3 2") }
     val iconImage by lazy { lineIcon("image", "M3.5 5h17v14h-17z", circle(9f, 10f, 2f), "M20.5 15l-5-5-9.5 9") }
+    val iconTheme by lazy { lineIcon("theme", "M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z") }
     val iconTextSize by lazy { lineIcon("text-size", "M4 18L9 6l5 12M5.8 14h6.4M15 18l3-7 3 7M15.9 16h4.2") }
     val iconDownload by lazy { lineIcon("download", "M12 4v11M7 10l5 5 5-5M5 20h14") }
     val iconUpload by lazy { lineIcon("upload", "M12 15V4M7 9l5-5 5 5M5 20h14") }

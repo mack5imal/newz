@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import app.newz.store.TextSize
+import app.newz.store.ThemeMode
 import app.newz.ui.components.AppBarSub
 import app.newz.ui.components.Button
 import app.newz.ui.components.ButtonVariant
@@ -50,6 +51,8 @@ class SettingsDestinations(
 
 private val TEXT_SIZES = listOf(TextSize.SMALL, TextSize.DEFAULT, TextSize.LARGE, TextSize.EXTRA_LARGE)
 private val TEXT_SIZE_LABELS = listOf("Small", "Default", "Large", "Extra large")
+private val THEMES = listOf(ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK)
+private val THEME_LABELS = listOf("System", "Light", "Dark")
 
 /** The Better pictures row's subtitle, kept on one source line so the HANDOFF copy check finds it. */
 @Suppress("ktlint:standard:max-line-length", "ktlint:standard:property-naming")
@@ -179,6 +182,18 @@ fun SettingsScreen(
                         contentDescription = "Better pictures from article pages",
                     )
                 },
+            )
+            ListRow(title = "Theme", icon = NewzIcons.iconTheme)
+            SegmentedControl(
+                options = THEME_LABELS,
+                selectedIndex = THEMES.indexOf(p.theme),
+                onSelect = { viewModel.setTheme(THEMES[it]) },
+                modifier =
+                    Modifier.padding(
+                        start = NewzTokens.spaceL,
+                        end = NewzTokens.spaceL,
+                        bottom = NewzTokens.spaceL,
+                    ),
             )
             ListRow(title = "Text size", icon = NewzIcons.iconTextSize)
             SegmentedControl(
