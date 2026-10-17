@@ -3,6 +3,7 @@ package app.newz.ui.suggestions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.newz.AppGraph
+import app.newz.catalog.PaywallStatus
 import app.newz.discover.SuggestionRanker
 import app.newz.discover.Suggestions
 import app.newz.discover.followCatalogTopic
@@ -61,6 +62,9 @@ class SuggestionsViewModel(
         p: UserPrefs,
         outletId: String,
     ): Boolean = !p.followedOutlets[outletId].isNullOrEmpty() && outletId !in p.removedOutlets
+
+    /** The outlet's paywall status from the catalog, or null for an unknown outlet. */
+    fun outletPaywall(outletId: String): PaywallStatus? = catalog.outlet(outletId)?.paywall
 
     fun isFollowingTopic(
         p: UserPrefs,

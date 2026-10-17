@@ -6,11 +6,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import app.newz.catalog.PaywallStatus
 import app.newz.discover.Ranked
 import app.newz.ui.components.NoteRow
 import app.newz.ui.components.Panel
 import app.newz.ui.components.RankTile
 import app.newz.ui.components.StatePanel
+import app.newz.ui.components.TagKind
 import app.newz.ui.nav.Screen
 import app.newz.ui.search.ResultRow
 import app.newz.ui.settings.ScreenFrame
@@ -80,6 +82,12 @@ fun SuggestionsScreen(
                         subtitle = ranked.topicName?.let { "$it · ${ranked.reason}" } ?: ranked.reason,
                         following = viewModel.isFollowingOutlet(p, ranked.id),
                         onFollow = { viewModel.followOutlet(ranked.id) },
+                        tag =
+                            when (viewModel.outletPaywall(ranked.id)) {
+                                PaywallStatus.HARD -> TagKind.Paywall
+                                PaywallStatus.METERED -> TagKind.Metered
+                                PaywallStatus.NONE, null -> null
+                            },
                         modifier = Modifier.testTag(SuggestionsSemantics.outlet(ranked.id)),
                     )
                 }
@@ -110,11 +118,13 @@ private fun SuggestionRow(
     following: Boolean,
     onFollow: () -> Unit,
     modifier: Modifier = Modifier,
+    tag: TagKind? = null,
 ) {
     ResultRow(
         title = ranked.name,
         subtitle = subtitle,
         showDivider = rank > 1,
+        tag = tag,
         following = following,
         onFollow = onFollow,
         modifier = modifier,
