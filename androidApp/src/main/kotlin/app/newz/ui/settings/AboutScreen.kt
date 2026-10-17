@@ -30,7 +30,9 @@ private val ABOUT: List<Pair<String, List<String>>> =
             listOf(
                 "Newz has no accounts, no trackers and no analytics. Everything you choose — topics, " +
                     "sources, muted words, saved articles and reading history — stays on this phone.",
-                "Newz contacts only publishers’ feeds and images, and the pages you open. It never contacts Google.",
+                "Newz contacts only publishers’ feeds and images, and the pages you open. If you turn on " +
+                    "Better pictures, it also reads the start of an article’s page to find its picture. " +
+                    "It never contacts Google.",
                 "Your zip code is matched to an area on this phone and is never sent anywhere.",
             ),
         "Fonts" to

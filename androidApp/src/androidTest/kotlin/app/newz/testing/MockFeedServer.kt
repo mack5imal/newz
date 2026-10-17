@@ -106,6 +106,29 @@ class MockFeedServer(
             "</head><body>Hello</body></html>",
     )
 
+    /**
+     * Serves article [item] of [feed]'s page (see [articleUrl]) with `<meta property="og:image">`
+     * naming [image] (may be relative), or no picture when [image] is null. Better pictures reads it.
+     */
+    fun articlePage(
+        feed: Int,
+        item: Int,
+        image: String?,
+    ) = page(
+        "/article/$feed/$item",
+        "<!doctype html><html><head><title>Article</title>" +
+            image?.let { "<meta content=\"$it\" property=\"og:image\">" }.orEmpty() +
+            "</head><body>Story</body></html>",
+    )
+
+    /** The paths of every request served so far, in order (e.g. `/article/0/1`). */
+    val requestPaths: List<String>
+        get() = log.map { it.substringBefore('\n').split(' ').getOrElse(1) { "" } }
+
+    /** How many times article pages (`/article/…`) were requested, by path. */
+    fun articlePageReads(): Map<String, Int> =
+        requestPaths.filter { it.startsWith("/article/") }.groupingBy { it }.eachCount()
+
     /** Starts listening on 127.0.0.1 at a free port. */
     fun start(): MockFeedServer {
         server.dispatcher = FeedDispatcher()
@@ -117,7 +140,10 @@ class MockFeedServer(
 
     fun feedUrl(index: Int): String = "$baseUrl/feed/$index.xml"
 
-    /** An article link; never fetched by the app (articles open in the browser). */
+    /**
+     * An article link; the app fetches it only with Better pictures on (its page's start, for a
+     * picture — serve one with [articlePage]); otherwise articles open in the browser.
+     */
     fun articleUrl(
         feed: Int,
         item: Int,

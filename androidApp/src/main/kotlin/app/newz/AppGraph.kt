@@ -9,7 +9,9 @@ import app.newz.catalog.CatalogLoader
 import app.newz.db.NewzDatabase
 import app.newz.discover.FeedDiscovery
 import app.newz.engine.FeedRepository
+import app.newz.engine.PageImages
 import app.newz.engine.androidConnectivity
+import app.newz.net.PageImageFinder
 import app.newz.net.newzHttpClient
 import app.newz.platform.ArticleOpener
 import app.newz.platform.ShareLauncher
@@ -30,7 +32,7 @@ import kotlin.time.Instant
 /**
  * The app's hand-written dependency container: catalog, database ([ArticleStore]),
  * [PreferencesStore], [FeedRepository] (which owns the feed's
- * [app.newz.engine.RefreshCoordinator]), [NewzImageLoader], [ArticleOpener], [ShareLauncher]
+ * [app.newz.engine.RefreshCoordinator]), [PageImages], [NewzImageLoader], [ArticleOpener], [ShareLauncher]
  * and the clock. One graph lives per process; [NewzApplication] installs it and screens read it
  * through [get]. Instrumented tests swap parts of it with [override] before launching an activity.
  */
@@ -111,7 +113,7 @@ class AppGraph private constructor(
     val articleOpener: ArticleOpener = ArticleOpener(config.customTabsProvider)
     val shareLauncher: ShareLauncher = ShareLauncher()
 
-    /** The one guarded HTTP client the feed engine and search's address check share. */
+    /** The one guarded HTTP client the feed engine, search's address check and [pageImages] share. */
     private val httpClient: HttpClient by lazy { config.httpClient() }
 
     /** Checks a typed web address for a feed (design `search`); nothing it sees is recorded. */
@@ -134,6 +136,17 @@ class AppGraph private constructor(
             prefs = preferencesStore.prefs,
             catalog = config.catalog,
             client = httpClient,
+            isOnline = config.isOnline,
+            clock = config.clock,
+        )
+    }
+
+    /** Pictures read from article pages when Better pictures is on (B5). */
+    val pageImages: PageImages by lazy {
+        PageImages(
+            store = articleStore,
+            finder = PageImageFinder(httpClient),
+            prefs = preferencesStore.prefs,
             isOnline = config.isOnline,
             clock = config.clock,
         )

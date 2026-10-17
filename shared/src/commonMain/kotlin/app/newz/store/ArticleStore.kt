@@ -12,13 +12,15 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import app.newz.db.Article as ArticleRow
 import app.newz.db.Feed_status as FeedStatusRow
+import app.newz.db.Page_image as PageImageRow
 import app.newz.db.Saved as SavedRow
 
 /** Opens this platform's database: a file on Android and iOS, in memory on the JVM (tests). */
 expect fun createSqlDriver(): SqlDriver
 
 /**
- * The on-device article cache plus the user's hidden, saved, history and custom-feed tables.
+ * The on-device article cache plus the user's hidden, saved, history and custom-feed tables, and
+ * the pictures found on article pages.
  * [historyEnabled] is read on every [recordOpen]; when it returns false nothing is recorded.
  */
 class ArticleStore(
@@ -239,6 +241,37 @@ class ArticleStore(
             CustomFeed(it.id, it.url, it.title, it.siteUrl, it.kind, Instant.fromEpochMilliseconds(it.addedAt))
         }
 
+    // Page images
+
+    /** What reading [articleUrl]'s page found, or null when it was never read. */
+    fun pageImage(articleUrl: String): PageImage? =
+        db.pageImageQueries
+            .selectByUrl(articleUrl)
+            .executeAsOneOrNull()
+            ?.toModel()
+
+    /** Every page read for an article of [outletId]. */
+    fun pageImagesOf(outletId: String): List<PageImage> =
+        db.pageImageQueries
+            .selectByOutlet(outletId)
+            .executeAsList()
+            .map { it.toModel() }
+
+    /** Records what reading [articleUrl]'s page found; [imageUrl] null records that it found nothing. */
+    fun recordPageImage(
+        articleUrl: String,
+        outletId: String,
+        imageUrl: String?,
+        fetchedAt: Instant = Clock.System.now(),
+    ) {
+        db.pageImageQueries.insert(articleUrl, outletId, imageUrl, fetchedAt.toEpochMilliseconds())
+    }
+
+    /** Forgets page reads older than [PAGE_IMAGE_RETENTION]. */
+    fun prunePageImages(now: Instant = Clock.System.now()) {
+        db.pageImageQueries.pruneBefore((now - PAGE_IMAGE_RETENTION).toEpochMilliseconds())
+    }
+
     /**
      * Replaces the hidden, saved, custom-feed and history tables with the given rows in one
      * transaction (backup restore). Any failure, such as a duplicate id, rolls all of it back.
@@ -292,6 +325,12 @@ class ArticleStore(
         /** How long a hide is remembered. */
         val HIDDEN_RETENTION: Duration = 30.days
 
+        /**
+         * How long a page read is remembered: longer than an article is cached, so a page is never
+         * read twice, and long enough to spot an outlet's logo standing in for its pictures.
+         */
+        val PAGE_IMAGE_RETENTION: Duration = 30.days
+
         private val topicsSerializer = ListSerializer(String.serializer())
 
         private fun encodeTopics(topics: List<String>): String = Json.encodeToString(topicsSerializer, topics)
@@ -312,6 +351,9 @@ class ArticleStore(
                 Instant.fromEpochMilliseconds(firstSeenAt),
                 decodeTopics(topics),
             )
+
+        private fun PageImageRow.toModel() =
+            PageImage(articleUrl, outletId, imageUrl, Instant.fromEpochMilliseconds(fetchedAt))
 
         private fun FeedStatusRow.toModel() =
             FeedStatus(

@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import app.newz.ui.image.MIN_PICTURE_SOURCE_WIDTH
+import app.newz.ui.image.TinyImageException
 import app.newz.ui.image.minSourceWidth
 import app.newz.ui.image.rememberNewzImageLoader
 import app.newz.ui.theme.NewzIcons
@@ -49,7 +50,8 @@ import coil3.request.ImageRequest
  * `type-headline` [headline] (padding 14 16, wraps, never truncated), an [ArticleImage] or
  * [NoImagePanel], then [CardActions]. Tapping anywhere outside its buttons calls [onOpen].
  * [groupCount] is the number of other outlets carrying the story (0 = not grouped).
- * [onLongPress], when set, is the long-press shortcut to the card menu.
+ * [onLongPress], when set, is the long-press shortcut to the card menu. [onTinyPicture] is called
+ * when the picture at [imageUrl] turns out under [MIN_PICTURE_SOURCE_WIDTH] px wide.
  */
 @Composable
 fun ArticleCard(
@@ -66,6 +68,7 @@ fun ArticleCard(
     groupCount: Int = 0,
     onGroup: () -> Unit = {},
     onLongPress: (() -> Unit)? = null,
+    onTinyPicture: () -> Unit = {},
     imageLoader: ImageLoader = rememberNewzImageLoader(),
 ) {
     val c = palette()
@@ -88,7 +91,7 @@ fun ArticleCard(
                 ),
         )
         if (imageUrl != null) {
-            ArticleImage(url = imageUrl, topic = topic, imageLoader = imageLoader)
+            ArticleImage(url = imageUrl, topic = topic, imageLoader = imageLoader, onTooSmall = onTinyPicture)
         } else {
             NoImagePanel(topic = topic)
         }
@@ -151,7 +154,7 @@ private enum class PictureState { Loading, Shown, NoPicture }
 /**
  * The [PictureState] for Coil's [state]: a load that fails (or whose host is blocked) has no
  * picture, and so has one whose source is narrower than [MIN_PICTURE_SOURCE_WIDTH] (the
- * request's [minSourceWidth] fails it with [app.newz.ui.image.TinyImageException]).
+ * request's [minSourceWidth] fails it with [TinyImageException]).
  */
 private fun pictureStateOf(state: AsyncImagePainter.State): PictureState =
     when (state) {
@@ -166,7 +169,7 @@ private fun pictureStateOf(state: AsyncImagePainter.State): PictureState =
  * `image-hatch` lines every 11 dp until it loads; if loading fails, the host is blocked or the
  * source is under [MIN_PICTURE_SOURCE_WIDTH] px wide (a thumbnail that would look blocky at full
  * width) it is replaced by the [NoImagePanel] for [topic], so an unusable picture looks the same
- * as none. Loaded only through the guarded [imageLoader].
+ * as none; [onTooSmall] is called for the last case. Loaded only through the guarded [imageLoader].
  */
 @Composable
 fun ArticleImage(
@@ -175,6 +178,7 @@ fun ArticleImage(
     modifier: Modifier = Modifier,
     contentDescription: String = "Article image",
     imageLoader: ImageLoader = rememberNewzImageLoader(),
+    onTooSmall: () -> Unit = {},
 ) {
     val c = palette()
     val context = LocalContext.current
@@ -205,7 +209,10 @@ fun ArticleImage(
             imageLoader = imageLoader,
             contentScale = ContentScale.Crop,
             alignment = PhotoAlignment,
-            onState = { picture = pictureStateOf(it) },
+            onState = { state ->
+                picture = pictureStateOf(state)
+                if (state is AsyncImagePainter.State.Error && state.result.throwable is TinyImageException) onTooSmall()
+            },
             modifier = Modifier.matchParentSize(),
         )
     }

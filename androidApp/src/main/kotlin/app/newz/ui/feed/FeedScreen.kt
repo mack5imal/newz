@@ -375,13 +375,23 @@ private fun FeedArticleCard(
 ) {
     val lead = card.group.lead
     val info = card.info()
+    val prefs by viewModel.prefs.collectAsState()
+    val pagePictures by viewModel.pagePictures.collectAsState()
+    // The feed's picture turned out under 300 px wide: the card shows tiles unless the page has one.
+    var feedPictureTiny by remember(lead.id) { mutableStateOf(false) }
+    val feedPicture = lead.imageUrl?.takeUnless { feedPictureTiny }
+    val wantsPagePicture = feedPicture == null && prefs?.betterPictures == true
+    if (wantsPagePicture) {
+        LaunchedEffect(lead.url) { viewModel.findPagePicture(lead) }
+    }
     ArticleCard(
         outlet = viewModel.outletName(lead),
         age = viewModel.shortAge(lead),
         spokenAge = viewModel.spokenAge(lead),
         headline = lead.title,
-        imageUrl = lead.imageUrl,
+        imageUrl = feedPicture ?: pagePictures[lead.url].takeIf { wantsPagePicture },
         topic = viewModel.topicName(lead.primaryTopic),
+        onTinyPicture = { if (feedPicture != null) feedPictureTiny = true },
         onOpen = { onCard(lead) },
         onShare = { onShare(lead) },
         onMore = { onMore(card) },

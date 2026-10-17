@@ -251,6 +251,10 @@ sqldelight {
     databases {
         create("NewzDatabase") {
             packageName.set("app.newz.db")
+            // Each released schema is kept as databases/<version>.db; verifyMigrations checks that
+            // the .sqm migrations turn every older one into the current .sq schema.
+            schemaOutputDirectory.set(file("src/commonMain/sqldelight/databases"))
+            verifyMigrations.set(true)
         }
     }
 }

@@ -234,6 +234,7 @@ How to draw them:
 | `icon-tag` | `<path d="M3.5 12.5V4h8.5l8.5 8.5-8.5 8.5z"/><circle cx="8" cy="8.5" r="1.5"/>` | Topics & keywords row |
 | `icon-compass` | `<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>` | Suggestions row and empty state |
 | `icon-clock` | `<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>` | Reading history row |
+| `icon-image` | `<path d="M3.5 5h17v14h-17z"/><circle cx="9" cy="10" r="2"/><path d="M20.5 15l-5-5-9.5 9"/>` | Better pictures row (not drawn) |
 | `icon-text-size` | `<path d="M4 18L9 6l5 12M5.8 14h6.4M15 18l3-7 3 7M15.9 16h4.2"/>` | Text size row |
 | `icon-download` | `<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>` | Export, Backup & restore row |
 | `icon-upload` | `<path d="M12 15V4M7 9l5-5 5 5M5 20h14"/>` | Choose a backup file |
@@ -255,7 +256,7 @@ Each entry gives what the component is, where it appears, and its exact measurem
 - `CardStrip` — the header band of `ArticleCard`: `strip`, min height 48, padding 0 8 0 14, gap 12; the outlet name is in `type-outlet` `sky` (it wraps and is never truncated) with `FlapAge` at the right; at Extra large it gets 10 dp of top and bottom padding and the tiles top-align.
 - `FlapAge` — the article age in `CardStrip`, `StoryRow` and `SavedCard`: one `FlapTile` per character of the age string ("now", "5m", "3h", "2d"), gap 3; it is spoken as a single label, e.g. "2 hours ago".
 - `FlapTile` — the split-flap character used by `FlapAge`, `LoadingBoard`, `RankTile`, `NoImagePanel` and the END board: a `tile` rectangle, 24×32 (18×24 small), `radius-control`, with a centred `type-tile` character in `sky` and a 2 dp `strip` line across it 15 dp from the top (11 on small tiles); build it from live text, not images.
-- `ArticleImage` — the article photo in `ArticleCard`: full card width at 16:9 (218 dp on a 388 dp card), cropped to fill and anchored a quarter of the way down (vertical bias −0.5), so a tall photo keeps its upper part (faces) and a wide one crops its sides evenly; the Saved thumbnail crops the same way; it shows `image-placeholder` with `image-hatch` lines every 11 dp until it loads; if loading fails, the image host is blocked, or the picture's source is under 300 px wide (a feed thumbnail that would look blocky stretched to the card), it is replaced by the `NoImagePanel`, so an unusable picture looks the same as none; it is the only thing fetched from an article's site.
+- `ArticleImage` — the article photo in `ArticleCard`: full card width at 16:9 (218 dp on a 388 dp card), cropped to fill and anchored a quarter of the way down (vertical bias −0.5), so a tall photo keeps its upper part (faces) and a wide one crops its sides evenly; the Saved thumbnail crops the same way; it shows `image-placeholder` with `image-hatch` lines every 11 dp until it loads; if loading fails, the image host is blocked, or the picture's source is under 300 px wide (a feed thumbnail that would look blocky stretched to the card), it is replaced by the `NoImagePanel`, so an unusable picture looks the same as none; it is the only thing fetched from an article's site, unless Better pictures is on: then a card whose feed picture is missing or under 300 px wide reads the first 64 KB of its article's page for an `og:image` (or `twitter:image`), shows the `NoImagePanel` until that picture arrives, and keeps the panel when the page has none, names only a tiny one, or names the same image as two or more other articles of the outlet (its logo).
 - `NoImagePanel` — replaces `ArticleImage` when an article has no picture: none in the feed, or one that failed to load (`feed.png`, second card): a 104 dp `strip` panel with the article's first topic spelled in `FlapTile`s (gap 3; a space is a blank tile-wide gap), 12 from the left and centred top to bottom. If the word doesn't fit at full size (24×32) it uses small tiles (18×24); if it still doesn't fit it is cut after the last whole letter that fits. Like every tile, the letters keep their size at every text size. Decorative and hidden from screen readers.
 - `CardActions` — the bottom row of `ArticleCard`: 64 tall, padding 0 4 0 12, with a `GroupButton` at the left on grouped cards only and Share and ⋮ `IconButton`s at the right.
 - `GroupButton` — "+n sources" on grouped cards: 48 tall, padding 0 14, a trailing 20 dp `icon-arrow-right` with gap 10, `type-button`, `radius-control`; light uses a `navy` fill with `sky` text, dark is transparent with a 2 dp `sky` border, padding 0 12.
@@ -272,7 +273,7 @@ Each entry gives what the component is, where it appears, and its exact measurem
 - `Panel` — the grouped lists on every settings-style screen: a `card` block with 12 side margins and 14 below, made of a `PanelHeader` followed by `ListRow`s or other content.
 - `PanelHeader` — the title band of a `Panel`: min height 40, padding 0 14, a `strip` background, and the title in `type-panel-header` at the left with an optional count in the same style at the right, both `sky`.
 - `ListRow` — the rows in `Panel`s: min height 64, padding 8 8 8 16, a 1 dp `line-subtle` divider above (none directly under a `PanelHeader`), an optional 22 dp leading icon in `icon` with gap 14, a title in `type-row-title` and a subtitle in `type-row-sub`, and an optional trailing `icon-chevron`, `Switch` or `Button`; when the row navigates, the whole row is the touch target.
-- `Switch` — the Paywall filter and Reading history toggles in `settings`: a 56×32 track with a 2 dp `line` border and `radius-switch`, and a 20 dp thumb with radius 2; off is a transparent track with a `line` thumb 4 from the left, on is a `button` track and border with an `on-button` thumb 4 from the right.
+- `Switch` — the Paywall filter, Reading history and Better pictures toggles in `settings`: a 56×32 track with a 2 dp `line` border and `radius-switch`, and a 20 dp thumb with radius 2; off is a transparent track with a `line` thumb 4 from the left, on is a `button` track and border with an `on-button` thumb 4 from the right.
 - `SegmentedControl` — Text size in `settings` and the topic levels in `settings-topics`: 48 tall with a 2 dp `line` border and `radius-control`; its equal segments are divided by 2 dp `line` and set in `type-segment`; the selected segment is `button`/`on-button`.
 - `Checkbox` — section feeds in `settings-sources` and "Include reading history" in `backup`: 24 square with a 2 dp `line` border and `radius-control`; when checked it has a `button` fill and a 16 dp `icon-check` (stroke 3) in `on-button`; its 48 dp row is the touch target.
 - `Tag` — small outline labels ("Paywall", "Following") in `settings-sources`, `story-group`, `search` and `suggestions`: 24 tall, padding 0 7, a 1.5 dp `line` border, `radius-control` and `type-tag`.
@@ -442,6 +443,7 @@ Reading:
 - Paywall filter — `Switch`. When on, hides outlets that are paywalled in the catalog or marked by the user.
 - Reading history — `Switch`. Turning it off stops recording but doesn't clear what's stored.
 - "Clear reading history" — Outline `Button`, indented to line up with the text (52 dp). Opens a `ConfirmSheet` (a `BottomSheet` with the title, the message in `type-intro` `ink-muted`, and Cancel (Text) / "Clear history" (Primary) at the right, as on the zip code sheet); "Clear history" clears and shows a `Snackbar` "Reading history cleared" with no Undo.
+- Better pictures from article pages — `Switch` (icon `icon-image`), off by default, below "Clear reading history". When on, a card whose feed picture is missing or tiny reads the start of the article's page for a better one (see `ArticleImage`). Not drawn.
 - Text size — row title with an icon, then a full-width `SegmentedControl` (Small / Default / Large / Extra large). Applies immediately; see Text size.
 
 Your data:
@@ -792,6 +794,8 @@ Strings are exact. Signage-styled text (see `font-signage`) displays in capitals
 - `Clear history`
 - `Cancel`
 - `Reading history cleared` (snackbar, no Undo; not drawn)
+- `Better pictures from article pages` (not drawn)
+- `When a feed’s picture is missing or tiny, read the start of the article’s page to find a better one.` (not drawn)
 - `Text size`
 - `Small`
 - `Default`

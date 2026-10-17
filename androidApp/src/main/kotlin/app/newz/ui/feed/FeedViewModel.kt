@@ -151,6 +151,16 @@ class FeedViewModel(
         repository.loadMore()
     }
 
+    /** Article URL -> the picture read from its page (Better pictures); see [findPagePicture]. */
+    val pagePictures: StateFlow<Map<String, String?>> = graph.pageImages.images
+
+    /**
+     * Better pictures (B5): reads [article]'s page for a picture when the switch is on and the
+     * phone is online, once per article. A card calls it while it is composed and its own picture
+     * is missing or tiny; leaving composition cancels a read still waiting its turn.
+     */
+    suspend fun findPagePicture(article: Article) = graph.pageImages.load(article.url, article.outletId)
+
     /** Card or story-row tap: records the open (when history is on) and opens the browser tab. */
     fun open(
         context: Context,

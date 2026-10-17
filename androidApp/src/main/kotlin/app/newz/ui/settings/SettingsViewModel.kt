@@ -148,6 +148,9 @@ class SettingsViewModel(
 
     fun setReadingHistory(on: Boolean) = update { it.copy(readingHistoryOn = on) }
 
+    /** Better pictures (B5): off by default; on lets the feed read the start of article pages. */
+    fun setBetterPictures(on: Boolean) = update { it.copy(betterPictures = on) }
+
     fun setTextSize(size: TextSize) = update { it.copy(textSize = size) }
 
     /** Clears every reading-history row at once; there is no Undo. */

@@ -167,6 +167,20 @@ fun SettingsScreen(
                         bottom = NewzTokens.spaceS,
                     ),
             )
+            ListRow(
+                title = "Better pictures from article pages",
+                subtitle =
+                    "When a feed’s picture is missing or tiny, read the start of the article’s page to find " +
+                        "a better one.",
+                icon = NewzIcons.iconImage,
+                trailing = {
+                    Switch(
+                        checked = p.betterPictures,
+                        onCheckedChange = viewModel::setBetterPictures,
+                        contentDescription = "Better pictures from article pages",
+                    )
+                },
+            )
             ListRow(title = "Text size", icon = NewzIcons.iconTextSize)
             SegmentedControl(
                 options = TEXT_SIZE_LABELS,

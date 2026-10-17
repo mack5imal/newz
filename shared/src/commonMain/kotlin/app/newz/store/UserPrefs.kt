@@ -61,6 +61,9 @@ data class MutedKeyword(
  *   state, so restoring it brings back exactly what was followed before.
  * - [followedOutlets] maps an outlet id to the ids of its enabled section feeds.
  * - [zip] and [localMetroId] drive the Local topic (SPEC S29).
+ * - [betterPictures] (off by default) lets the feed read the start of an article's page for its
+ *   picture when the feed's own is missing or tiny (B5). Preferences and backups written before it
+ *   existed read as off.
  */
 @Serializable
 data class UserPrefs(
@@ -78,4 +81,5 @@ data class UserPrefs(
     val textSize: TextSize = TextSize.DEFAULT,
     val zip: String? = null,
     val localMetroId: String? = null,
+    val betterPictures: Boolean = false,
 )

@@ -60,6 +60,7 @@ class BackupCodecTest {
             textSize = TextSize.EXTRA_LARGE,
             zip = "02134",
             localMetroId = "boston",
+            betterPictures = true,
         )
 
     private fun article(n: Int) =
@@ -111,6 +112,22 @@ class BackupCodecTest {
             val restoredPrefs = target.prefs.prefs.first()
             assertEquals(fullPrefs, restoredPrefs)
             assertEquals("02134", restoredPrefs.zip)
+            assertTrue(restoredPrefs.betterPictures)
+        }
+
+    @Test
+    fun backupAndPrefsWrittenBeforeBetterPicturesReadItAsOff() =
+        runTest {
+            val json = populated().export(includeHistory = false)
+            assertTrue(json.contains("\"betterPictures\": true"))
+            val old = json.replace(Regex(",\\s*\"betterPictures\": true"), "")
+            assertFalse(old.contains("betterPictures"))
+            val contents = BackupCodec.import(old).getOrThrow()
+            assertEquals(fullPrefs.copy(betterPictures = false), contents.prefs)
+
+            val oldPrefs = PreferencesStore.encode(fullPrefs).replace(Regex(",\\s*\"betterPictures\":true"), "")
+            assertFalse(oldPrefs.contains("betterPictures"))
+            assertEquals(fullPrefs.copy(betterPictures = false), PreferencesStore.decode(oldPrefs))
         }
 
     @Test

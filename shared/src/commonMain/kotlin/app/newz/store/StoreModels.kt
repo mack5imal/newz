@@ -90,6 +90,17 @@ data class FeedStatus(
 )
 
 /**
+ * What reading an article's page found (Settings › Better pictures): its picture, or null when
+ * the page named none or could not be read.
+ */
+data class PageImage(
+    val articleUrl: String,
+    val outletId: String,
+    val imageUrl: String?,
+    val fetchedAt: Instant,
+)
+
+/**
  * Stable article ids: a 64-bit FNV-1a hash of the outlet id plus the guid (or the url when there is
  * no guid). Scoping by outlet keeps two outlets that reuse the same non-global guid apart.
  */

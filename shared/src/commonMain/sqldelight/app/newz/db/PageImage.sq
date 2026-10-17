@@ -1,0 +1,22 @@
+-- Pictures found on article pages for Settings › Better pictures. imageUrl is null when the page
+-- named none or could not be read, so each page is read at most once. Pruned like articles.
+CREATE TABLE page_image (
+    articleUrl TEXT NOT NULL PRIMARY KEY,
+    outletId TEXT NOT NULL,
+    imageUrl TEXT,
+    fetchedAt INTEGER NOT NULL
+);
+
+CREATE INDEX page_image_outlet ON page_image(outletId);
+
+insert:
+INSERT OR REPLACE INTO page_image(articleUrl, outletId, imageUrl, fetchedAt) VALUES (?, ?, ?, ?);
+
+selectByUrl:
+SELECT * FROM page_image WHERE articleUrl = ?;
+
+selectByOutlet:
+SELECT * FROM page_image WHERE outletId = ?;
+
+pruneBefore:
+DELETE FROM page_image WHERE fetchedAt < ?;

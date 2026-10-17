@@ -8,6 +8,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -197,6 +199,29 @@ class SettingsControlsTest {
         assertTrue("none: no hidden note", !inRow(2, hiddenNote))
         // The first outlet is expanded to its section feeds.
         assertTrue(exists(hasContentDescription("The Harbor Ledger section feeds")))
+    }
+
+    @Test
+    fun betterPicturesIsOffByDefaultAndToggles() {
+        server.fill(itemsPerFeed = 3)
+        start()
+        assertTrue(!currentPrefs().betterPictures)
+
+        openSettings()
+        val switch = hasContentDescription("Better pictures from article pages") and hasClickAction()
+        compose.onNode(switch).performScrollTo().assertIsOff()
+        compose.onNode(switch).performClick()
+        compose.waitUntil(TIMEOUT) { currentPrefs().betterPictures }
+        compose.onNode(switch).assertIsOn()
+        compose.onNode(switch).performClick()
+        compose.waitUntil(TIMEOUT) { !currentPrefs().betterPictures }
+
+        // About says what the switch reads.
+        compose.onNode(hasText("About") and hasClickAction()).performScrollTo().performClick()
+        waitForScreen(Screen.About)
+        compose
+            .onNode(hasText("it also reads the start of an article’s page to find its picture", substring = true))
+            .assertExists()
     }
 
     @Test

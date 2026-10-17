@@ -1,0 +1,10 @@
+-- Version 1 -> 2: the page_image table for Settings › Better pictures (B5). Nothing else changes,
+-- so an existing install keeps every article, hidden, saved, history and custom-feed row.
+CREATE TABLE page_image (
+    articleUrl TEXT NOT NULL PRIMARY KEY,
+    outletId TEXT NOT NULL,
+    imageUrl TEXT,
+    fetchedAt INTEGER NOT NULL
+);
+
+CREATE INDEX page_image_outlet ON page_image(outletId);

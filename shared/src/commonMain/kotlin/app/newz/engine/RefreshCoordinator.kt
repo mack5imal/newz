@@ -101,6 +101,7 @@ class RefreshCoordinator(
                     val now = clock()
                     store.pruneOlderThan(ArticleStore.ARTICLE_RETENTION, now)
                     store.pruneHidden(now)
+                    store.prunePageImages(now)
                     val failing =
                         store
                             .feedStatuses()

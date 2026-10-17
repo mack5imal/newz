@@ -167,4 +167,34 @@ suspend fun HttpClient.fetchCapped(
         )
     }
 
+/**
+ * GETs [url] and returns only the first [maxBytes] bytes of the decoded body (all of it when it
+ * is shorter), then stops: the rest is never read, and the response is closed. Used to read the
+ * start of an article page without downloading the page.
+ */
+suspend fun HttpClient.fetchStart(
+    url: String,
+    maxBytes: Int,
+): FetchResult =
+    prepareGet(url).execute { response ->
+        if (!response.status.isSuccess()) return@execute FetchResult.HttpError(response.status.value)
+        val channel = response.bodyAsChannel()
+        val bytes = ByteArray(maxBytes)
+        var total = 0
+        while (total < maxBytes) {
+            // Never asks for more than is still wanted, so no byte past the cap is read.
+            val read = channel.readAvailable(bytes, total, minOf(CHUNK_SIZE, maxBytes - total))
+            if (read < 0) break
+            total += read
+        }
+        FetchResult.Success(
+            bytes = if (total == maxBytes) bytes else bytes.copyOf(total),
+            charset = response.contentType()?.parameter("charset"),
+            finalUrl =
+                response.call.request.url
+                    .toString(),
+            status = response.status.value,
+        )
+    }
+
 private const val CHUNK_SIZE = 8 * 1024
