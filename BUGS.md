@@ -10,6 +10,8 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 ## Open
 
 
+## Fixed
+
 ### B17 — Wordmark flips forever and "Refreshing your feed…" never goes away
 - **Severity:** High (feed never finishes loading; phone CPU at 100%, battery drain)
 - **Where:** `shared/src/commonMain/kotlin/app/newz/dedup/StoryGrouper.kt` (`group`, `Building.similarity`),
@@ -29,8 +31,7 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
   groups inside the 48-hour window, and only groups sharing a word with the article), and while a
   first load runs recompose at most every ~1 s instead of once per feed; add a performance test
   with thousands of articles.
-
-## Fixed
+- **Fixed in:** `39c479f` (story grouping ~8.5× faster on 5,000 articles, identical results and dedup scores) and `b1ada46` (at most one recompose a second during a first load). Emulator release build: fresh first load settles in ~10 s, pull to refresh ~7 s.
 
 ### B9 — Opened article has no easy way back to Newz
 - **Severity:** Medium (feature request)
