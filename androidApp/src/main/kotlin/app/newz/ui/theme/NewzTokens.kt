@@ -354,6 +354,38 @@ object NewzTokens {
     val cardCollapse = 200
     val snackbarTimeout = 6_000L
     val spinnerTurn = 900
+
+    // Component measurements: values design/HANDOFF.md §Components gives per component that
+    // have no shared token above. Components read these, never literals.
+    val typeOutletSaved = signage(FontWeight.Bold, 16.sp, 20.sp, 0.08.em)
+    val typeHeadlineSaved = text(FontWeight.Bold, 18.sp, 24.sp, (-0.01).em)
+    val typeThumbTopic = signage(FontWeight.ExtraBold, 20.sp, 20.sp)
+    val typeBanner = text(FontWeight.SemiBold, 15.sp, 20.sp)
+    val typeSnackbarAction = signage(FontWeight.ExtraBold, 18.sp, tracking = 0.08.em)
+    val gapIconLabel = 6.dp
+    val navButtonPaddingH = 10.dp
+    val chipRowTopLight = 10.dp
+    val stripPaddingXl = 10.dp
+    val tileRuleOffset = 15.dp
+    val tileRuleOffsetSmall = 11.dp
+    val noImageBaselineDrop = 26.dp
+    val groupButtonPaddingH = 14.dp
+    val groupButtonGap = 10.dp
+    val snackbarPadding = 6.dp
+    val snackbarActionPaddingH = 14.dp
+    val statePanelBodyGap = 10.dp
+    val boardTilesGap = 18.dp
+    val skeletonBarSmall = 12.dp
+    val skeletonBar = 16.dp
+    val skeletonPaddingV = 18.dp
+    val skeletonGap = 10.dp
+    val sheetGrabberTop = 10.dp
+    val checkboxIcon = 16.dp
+    val tagHeight = 24.dp
+    val tagPaddingH = 7.dp
+    val savedActionsHeight = 52.dp
+    val bottomBarPaddingBottom = 24.dp
+    val appIconSize = 56.dp
 }
 
 // region Icons

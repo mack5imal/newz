@@ -56,11 +56,15 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.compose.foundation)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.ktor.client.core)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.ktor3)
 
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.ktor.client.mock)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
