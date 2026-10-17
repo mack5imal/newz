@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- `paper` (light) from design/HANDOFF.md, shown before Compose draws its first frame. -->
+    <color name="newz_paper">#DCE5F2</color>
+
+    <style name="Theme.Newz" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/newz_paper</item>
+    </style>
+</resources>

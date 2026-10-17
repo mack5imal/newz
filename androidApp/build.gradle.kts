@@ -72,7 +72,8 @@ val forbiddenDependencyPrefixes =
         "com.google.android.play",
         "com.google.ads",
         "com.google.android.libraries.places",
-        "androidx.compose.ui:ui-text-google-fonts",
+        // Prefix: also catches the downloadable-fonts artifact (fonts are bundled, SPEC S2).
+        "androidx.compose.ui:ui-text-google",
     )
 
 val verifyNoGoogleServices by tasks.registering {
