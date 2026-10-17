@@ -10,6 +10,8 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 ## Open
 
 
+## Fixed
+
 ### B18 — Wordmark animation only flashes now that loads are fast
 - **Severity:** Low (regression from B17's speed-up)
 - **Where:** `FlapWordmark` in `androidApp/src/main/kotlin/app/newz/ui/components/Flap.kt`
@@ -18,24 +20,27 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
   false; a refresh now often finishes in well under a second, mid-cycle.
 - **Requested:** always play at least one full cycle (letters flip until they spell NEWZ, ~2.2 s),
   and keep cycling for as long as the load lasts; finish the current cycle when it ends.
+- **Also requested:** the "Refreshing your feed…" band should last as long as the animation.
+- **Fixed in:** `0c527e5` (at least one full ~2.2 s cycle per load, keeps cycling while it runs, settles on NEWZ) and `81a6f7b` (the band shows from the pull until the tiles settle, sharing one state). With the phone's animations turned off, the tiles stay still and the band follows the refresh.
 
 ### B19 — Onboarding shows the app icon beside the wordmark
 - **Severity:** Low
 - **Where:** onboarding header in `androidApp/src/main/kotlin/app/newz/ui/onboarding/OnboardingScreen.kt`
 - **Requested:** remove the app icon; show only the NEWZ flap tiles.
+- **Fixed in:** `5c83638`.
 
 ### B20 — Article headlines a little too large
 - **Severity:** Low
 - **Where:** `NewzTokens.typeHeadline` (feed cards: 21 sp, 27 sp line height, bold)
 - **Requested:** a little smaller; amount to be chosen by the owner.
+- **Fixed in:** `05a16bc` — 18 sp on a 24 sp line (owner's choice); the story-group sheet title follows.
 
 ### B21 — Age tiles on the card strip too big next to the outlet name
 - **Severity:** Low
 - **Where:** `CardStrip` / `FlapAge` in `androidApp/src/main/kotlin/app/newz/ui/components/Cards.kt`
 - **Seen:** age tiles are 24×32 dp (24 sp character); the outlet name is 18 sp signage.
 - **Requested:** age tiles about the same size as the outlet name.
-
-## Fixed
+- **Fixed in:** `4df717d` — feed-card age tiles use the small 18×24 dp size.
 
 ### B17 — Wordmark flips forever and "Refreshing your feed…" never goes away
 - **Severity:** High (feed never finishes loading; phone CPU at 100%, battery drain)
