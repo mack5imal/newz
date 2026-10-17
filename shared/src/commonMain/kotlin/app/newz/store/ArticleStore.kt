@@ -44,7 +44,7 @@ class ArticleStore(
         var added = 0
         db.transaction {
             for (item in items) {
-                val id = ArticleIds.of(item.guid, item.url)
+                val id = ArticleIds.of(outletId, item.guid, item.url)
                 val publishedAt = item.publishedAt?.toEpochMilliseconds()
                 val existing = db.articleQueries.selectById(id).executeAsOneOrNull()
                 if (existing == null) {

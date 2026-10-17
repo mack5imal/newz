@@ -26,7 +26,7 @@ object EpochMillisSerializer : KSerializer<Instant> {
 }
 
 /**
- * One cached article. [id] is [ArticleIds.of] its guid (or url). [publishedAt] is the feed's date,
+ * One cached article. [id] is [ArticleIds.of] its outlet and guid (or url). [publishedAt] is the feed's date,
  * or [firstSeenAt] when the feed gave none. Timestamps are kept to the millisecond.
  */
 @Serializable
@@ -89,16 +89,21 @@ data class FeedStatus(
     val lastError: String?,
 )
 
-/** Stable article ids: a 64-bit FNV-1a hash of the guid, or of the url when there is no guid. */
+/**
+ * Stable article ids: a 64-bit FNV-1a hash of the outlet id plus the guid (or the url when there is
+ * no guid). Scoping by outlet keeps two outlets that reuse the same non-global guid apart.
+ */
 object ArticleIds {
     private const val OFFSET_BASIS = -0x340d631b7bdddcdbL // 0xcbf29ce484222325
     private const val PRIME = 0x100000001b3L
+    private const val SEPARATOR = '\u0000'
 
     fun of(
+        outletId: String,
         guid: String?,
         url: String,
     ): String {
-        val key = guid?.takeIf { it.isNotBlank() } ?: url
+        val key = outletId + SEPARATOR + (guid?.takeIf { it.isNotBlank() } ?: url)
         var hash = OFFSET_BASIS
         for (byte in key.encodeToByteArray()) {
             hash = (hash xor (byte.toLong() and 0xff)) * PRIME

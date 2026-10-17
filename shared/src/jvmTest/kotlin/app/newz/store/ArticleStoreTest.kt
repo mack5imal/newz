@@ -30,7 +30,7 @@ class ArticleStoreTest {
         seenAt: Instant = now,
     ): StoredArticle {
         store.upsert("feed-1", "outlet-1", listOf("tech"), listOf(item(guid, publishedAt)), seenAt)
-        return store.article(ArticleIds.of(guid, "https://example.com/$guid"))!!
+        return store.article(ArticleIds.of("outlet-1", guid, "https://example.com/$guid"))!!
     }
 
     @Test
@@ -53,11 +53,26 @@ class ArticleStoreTest {
     }
 
     @Test
-    fun idIsStableHashOfGuidElseUrl() {
-        assertEquals(ArticleIds.of("g", "https://a"), ArticleIds.of("g", "https://b"))
-        assertEquals(ArticleIds.of(null, "https://a"), ArticleIds.of(" ", "https://a"))
-        assertEquals(16, ArticleIds.of("g", "u").length)
-        assertFalse(ArticleIds.of("g1", "u") == ArticleIds.of("g2", "u"))
+    fun idIsStableHashOfOutletAndGuidElseUrl() {
+        assertEquals(ArticleIds.of("o", "g", "https://a"), ArticleIds.of("o", "g", "https://b"))
+        assertEquals(ArticleIds.of("o", null, "https://a"), ArticleIds.of("o", " ", "https://a"))
+        assertEquals(16, ArticleIds.of("o", "g", "u").length)
+        assertFalse(ArticleIds.of("o", "g1", "u") == ArticleIds.of("o", "g2", "u"))
+        assertFalse(ArticleIds.of("o1", "g", "u") == ArticleIds.of("o2", "g", "u"))
+    }
+
+    @Test
+    fun sameGuidFromTwoOutletsKeepsTwoRows() {
+        val first = ParsedItem("12345", "https://one.example/a", "One title", "Summary", null, now)
+        val second = ParsedItem("12345", "https://two.example/b", "Two title", "Summary", null, now)
+        assertEquals(1, store.upsert("feed-1", "outlet-1", listOf("tech"), listOf(first), now))
+        assertEquals(1, store.upsert("feed-2", "outlet-2", listOf("world"), listOf(second), now))
+        val rows = store.articles().associateBy { it.outletId }
+        assertEquals(2, rows.size)
+        assertEquals("One title", rows.getValue("outlet-1").title)
+        assertEquals("https://one.example/a", rows.getValue("outlet-1").url)
+        assertEquals("Two title", rows.getValue("outlet-2").title)
+        assertEquals("https://two.example/b", rows.getValue("outlet-2").url)
     }
 
     @Test
