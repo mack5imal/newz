@@ -110,8 +110,9 @@ const val NO_IMAGE_TAG = "noImagePanel"
 
 /**
  * `CardStrip` — the header band of an [ArticleCard]: `strip`, min height 48, padding 0 8 0 14,
- * gap 12; the outlet in `type-outlet` `sky` (wraps) with a [FlapAge] at the right. At Extra large
- * it gets 10 dp of top and bottom padding and the tiles top-align.
+ * gap 12; the outlet in `type-outlet` `sky` (wraps) with a small [FlapAge] (18×24 tiles, about
+ * the size of the outlet name, B21) at the right. At Extra large it gets 10 dp of top and bottom
+ * padding and the tiles top-align.
  */
 @Composable
 fun CardStrip(
@@ -134,7 +135,7 @@ fun CardStrip(
         verticalAlignment = if (xl) Alignment.Top else Alignment.CenterVertically,
     ) {
         SignageText(text = outlet, style = NewzTokens.typeOutlet, color = c.sky, modifier = Modifier.weight(1f))
-        FlapAge(age = age, spokenAge = spokenAge)
+        FlapAge(age = age, spokenAge = spokenAge, small = true)
     }
 }
 

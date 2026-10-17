@@ -210,7 +210,9 @@ class ComponentGalleryTest {
                 .size.width,
         )
         val age = composeRule.onNode(hasContentDescription("5 minutes ago")).fetchSemanticsNode()
-        assertTrue("age is ${age.size.width}px wide", age.size.width <= px(2 * TILE_WIDTH + TILE_GAP) + 1)
+        // B21: small 18×24 age tiles, about the size of the 18 sp outlet name.
+        assertTrue("age is ${age.size.width}px wide", age.size.width <= px(2 * SMALL_TILE_WIDTH + TILE_GAP) + 1)
+        assertEquals(px(SMALL_TILE_HEIGHT), age.size.height)
         val outlet = composeRule.onNode(hasText("The Evening Courier"), useUnmergedTree = true).fetchSemanticsNode()
         // Squeezed, the outlet was one letter wide and as tall as a photo.
         assertTrue("outlet is ${outlet.size.width}px wide", outlet.size.width >= px(OUTLET_MIN_WIDTH))
@@ -596,6 +598,8 @@ class ComponentGalleryTest {
         const val TAG_TILE = "flap-tile"
         const val STRIP_WIDTH = 360
         const val TILE_WIDTH = 24
+        const val SMALL_TILE_WIDTH = 18
+        const val SMALL_TILE_HEIGHT = 24
         const val TILE_GAP = 3
         const val OUTLET_MIN_WIDTH = 120
         const val OUTLET_MAX_HEIGHT = 48
