@@ -1,7 +1,6 @@
 package app.newz.ui.components
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateValue
@@ -22,10 +21,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +46,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.sp
 import app.newz.ui.theme.NewzTokens
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 
@@ -184,59 +187,108 @@ private fun rememberBoardStep(): Int {
     return step
 }
 
-/** Flips a still board from the start ([step] 0) until all four tiles spell "NEWZ": one cycle. */
-private suspend fun Animatable<Float, AnimationVector1D>.flipToNewz() {
-    snapTo(0f)
-    animateTo(
-        LANDING_STEPS.toFloat(),
-        tween(LANDING_STEPS * NewzTokens.flapFlip, easing = LinearEasing),
-    )
-}
-
 /**
- * The wordmark's step (B18). Each time [busy] turns true the tiles play at least one whole
- * cycle, flipping from the start until they spell NEWZ, so a load that ends within a moment still
- * shows the board turning instead of a flicker. While still busy when a cycle lands, they hold
- * NEWZ as long as the `LoadingBoard` does and flip again; once a cycle lands and [busy] is false
- * they stay on NEWZ. With animations switched off (animator duration scale 0) they stay still.
+ * The state of the [FlapWordmark]'s tiles (B18), hoisted so the feed can keep its pull-to-refresh
+ * message up for exactly as long as the tiles turn. Each time the screen turns busy (or [play] is
+ * called) the tiles play at least one whole cycle, flipping from the start until they spell NEWZ,
+ * so a load that ends within a moment still shows the board turning instead of a flicker. While
+ * still busy when a cycle lands, they hold NEWZ (up to as long as the `LoadingBoard` does) and
+ * flip again; once a cycle has landed and nothing is busy they stay on NEWZ and [cycling] turns
+ * false. With animations switched off (animator duration scale 0) the tiles stay still and
+ * [cycling] simply follows busy. Make one with [rememberFlapBoardState], which also drives it.
  */
-@Composable
-private fun rememberWordmarkStep(busy: Boolean): Int {
-    val board = remember { Animatable(LANDING_STEPS.toFloat()) }
-    val latestBusy by rememberUpdatedState(busy)
-    LaunchedEffect(board) {
-        val busyNow = snapshotFlow { latestBusy }
+@Stable
+class FlapBoardState internal constructor() {
+    private val board = Animatable(LANDING_STEPS.toFloat())
+    private var requested by mutableStateOf(false)
+
+    /** The step the tiles show (see [boardLetter]); [LANDING_STEPS] and above spell NEWZ. */
+    internal val step: Int by derivedStateOf { board.value.toInt() }
+
+    /** True from the moment the tiles start a cycle until they have settled on NEWZ. */
+    var cycling: Boolean by mutableStateOf(false)
+        private set
+
+    /** True from a [play] until the cycles it started (or joined) have settled on NEWZ. */
+    var played: Boolean by mutableStateOf(false)
+        private set
+
+    /** Starts a cycle now, or keeps the running one; marks it [played] until it settles. */
+    fun play() {
+        requested = true
+        played = true
+    }
+
+    /** Flips a still board from the start (step 0) until all four tiles spell "NEWZ": one cycle. */
+    private suspend fun flipToNewz() {
+        board.snapTo(0f)
+        board.animateTo(
+            LANDING_STEPS.toFloat(),
+            tween(LANDING_STEPS * NewzTokens.flapFlip, easing = LinearEasing),
+        )
+    }
+
+    /** Holds NEWZ one `flap-flip` at a time while [busy]: true when still busy after the full hold. */
+    private suspend fun holdWhile(busy: () -> Boolean): Boolean {
+        for (held in 1..HOLD_STEPS) {
+            if (!busy()) return false
+            board.animateTo(
+                (LANDING_STEPS + held).toFloat(),
+                tween(NewzTokens.flapFlip, easing = LinearEasing),
+            )
+        }
+        return busy()
+    }
+
+    internal suspend fun run(busy: () -> Boolean) {
+        val busyNow = snapshotFlow(busy)
         while (true) {
-            busyNow.first { it }
-            if (coroutineContext[MotionDurationScale]?.scaleFactor == 0f) {
-                busyNow.first { !it }
-                continue
-            }
-            board.flipToNewz()
-            if (!latestBusy) continue
-            // Flipping on for as long as the load lasts has no end of its own, so it runs as an
-            // infinite animation (which Compose tests switch off unless they drive the clock).
-            val keepFlipping: suspend () -> Unit = {
-                while (latestBusy) {
-                    board.animateTo(
-                        CYCLE_STEPS.toFloat(),
-                        tween(HOLD_STEPS * NewzTokens.flapFlip, easing = LinearEasing),
-                    )
-                    if (latestBusy) board.flipToNewz()
-                }
-            }
-            val policy = coroutineContext[InfiniteAnimationPolicy]
+            snapshotFlow { busy() || requested }.first { it }
+            requested = false
+            cycling = true
             try {
-                if (policy == null) keepFlipping() else policy.onInfiniteOperation(keepFlipping)
-            } catch (stopped: CancellationException) {
-                coroutineContext.ensureActive()
-                board.snapTo(LANDING_STEPS.toFloat())
-                busyNow.first { !it }
+                if (currentCoroutineContext()[MotionDurationScale]?.scaleFactor == 0f) {
+                    busyNow.first { !it }
+                } else {
+                    playCycles(busy)
+                }
+            } finally {
+                requested = false
+                cycling = false
+                played = false
             }
         }
     }
-    val step by remember { derivedStateOf { board.value.toInt() } }
-    return step
+
+    private suspend fun playCycles(busy: () -> Boolean) {
+        flipToNewz()
+        if (!busy()) return
+        // Flipping on for as long as the load lasts has no end of its own, so it runs as an
+        // infinite animation (which Compose tests switch off unless they drive the clock).
+        val keepFlipping: suspend () -> Unit = {
+            while (holdWhile(busy)) flipToNewz()
+        }
+        val policy = currentCoroutineContext()[InfiniteAnimationPolicy]
+        try {
+            if (policy == null) keepFlipping() else policy.onInfiniteOperation(keepFlipping)
+        } catch (stopped: CancellationException) {
+            currentCoroutineContext().ensureActive()
+            board.snapTo(LANDING_STEPS.toFloat())
+            snapshotFlow(busy).first { !it }
+        }
+    }
+}
+
+/**
+ * A [FlapBoardState] driven by [busy] for as long as the caller is composed, whether or not a
+ * [FlapWordmark] shows it.
+ */
+@Composable
+fun rememberFlapBoardState(busy: Boolean): FlapBoardState {
+    val state = remember { FlapBoardState() }
+    val latestBusy by rememberUpdatedState(busy)
+    LaunchedEffect(state) { state.run { latestBusy } }
+    return state
 }
 
 /**
@@ -246,7 +298,8 @@ private fun rememberWordmarkStep(busy: Boolean): Int {
  * turned over so it stands out on the navy bar in both themes. When [busy] turns true (the feed is
  * loading or refreshing) the tiles flip through letters back to NEWZ like the `LoadingBoard`: at
  * least one whole cycle, then again for as long as [busy] lasts, always stopping on NEWZ; otherwise
- * they stay still. Read as the [label] "Newz", a heading when [heading] (the app bar).
+ * they stay still (see [FlapBoardState]; pass a hoisted [board] to share its timing). Read as the
+ * [label] "Newz", a heading when [heading] (the app bar).
  */
 @Composable
 fun FlapWordmark(
@@ -255,9 +308,10 @@ fun FlapWordmark(
     label: String = "Newz",
     tileSize: DpSize = NewzTokens.tileSizeWordmark,
     heading: Boolean = true,
+    board: FlapBoardState = rememberFlapBoardState(busy),
 ) {
     val c = palette()
-    val step = rememberWordmarkStep(busy)
+    val step = board.step
     Row(
         modifier =
             modifier.clearAndSetSemantics {

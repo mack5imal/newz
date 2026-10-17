@@ -313,7 +313,7 @@ Interactions:
 - "+n sources" opens `story-group`.
 - Saved opens `saved`; Settings opens `settings`.
 - Tapping a chip toggles it, and several can be selected. With any chip selected, the feed shows only articles in those topics.
-- Pull to refresh slides a `paper` panel holding the line "Refreshing your feed…" (`type-row-title` in `ink`, centred, 12 above and below) down from under the app bar with the pull, and moves the list (chip row first) down by as much, so the panel never covers the chips; it stays until new articles are merged in, while the app-bar `FlapWordmark` tiles flip (B15). Age tiles that change flip.
+- Pull to refresh slides a `paper` panel holding the line "Refreshing your feed…" (`type-row-title` in `ink`, centred, 12 above and below) down from under the app bar with the pull, and moves the list (chip row first) down by as much, so the panel never covers the chips; it stays while the app-bar `FlapWordmark` tiles flip (B15) and goes when they settle on NEWZ, so the words and the tiles stop together: at least one whole tile cycle, and on a longer refresh until the new articles are merged in and the running cycle has landed (B18). Age tiles that change flip.
 
 States:
 - `feed.png` (populated) — a grouped card ("+3 sources") and a card with no image (`NoImagePanel` showing the topic); a third card starts below the bottom edge.

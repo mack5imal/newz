@@ -49,6 +49,7 @@ import app.newz.ui.components.ArticleCard
 import app.newz.ui.components.BoardPanel
 import app.newz.ui.components.Button
 import app.newz.ui.components.ButtonVariant
+import app.newz.ui.components.FlapBoardState
 import app.newz.ui.components.LoadingBoard
 import app.newz.ui.components.OfflineBanner
 import app.newz.ui.components.PlainText
@@ -57,6 +58,7 @@ import app.newz.ui.components.Snackbar
 import app.newz.ui.components.StatePanel
 import app.newz.ui.components.TopicChip
 import app.newz.ui.components.TopicChipRow
+import app.newz.ui.components.rememberFlapBoardState
 import app.newz.ui.theme.LocalNewzPalette
 import app.newz.ui.theme.NewzIcons
 import app.newz.ui.theme.NewzTokens
@@ -77,6 +79,17 @@ private const val OFFLINE_EMPTY_BODY =
 /** The pull-to-refresh panel: the board-high "Refreshing your feed…" line with 12 above and below. */
 private val REFRESH_PANEL_HEIGHT =
     NewzTokens.tileSize.height + NewzTokens.spaceXs + NewzTokens.space2xs + NewzTokens.spaceM * 2
+
+/**
+ * Whether the pull-to-refresh band ("Refreshing your feed…") shows (B18): from the pull until the
+ * app-bar wordmark settles on NEWZ, so the words and the tiles stop together — at least one whole
+ * tile cycle, then until the refresh has ended and the running cycle has landed. [refreshing]
+ * alone keeps it up too, should the tiles be still (animations off).
+ */
+internal fun refreshBandShown(
+    refreshing: Boolean,
+    board: FlapBoardState,
+): Boolean = refreshing || board.played
 
 /** `loadMore()` fires when the last visible card is within this many items of the end. */
 private const val LOAD_MORE_THRESHOLD = 5
@@ -117,7 +130,8 @@ private fun FeedCard.info(): FeedCardInfo {
  * is the `TopicChipRow` (it scrolls away), then `ArticleCard`s, with every drawn state: first
  * load, filter active / empty, end of feed, all filtered, offline with cache and offline empty.
  * Pull to refresh slides "Refreshing your feed…" down on a `paper` panel and moves the list down
- * below it; the app-bar wordmark tiles flip while the feed loads or refreshes. ⋮ and a long-press open [CardMenuSheet],
+ * below it until the app-bar wordmark tiles, which flip while the feed loads or refreshes, settle on
+ * NEWZ ([refreshBandShown]). ⋮ and a long-press open [CardMenuSheet],
  * whose Mute a keyword… opens [KeywordMuteSheet]. A card removed by an action collapses out
  * (`card-collapse`). The Undo `Snackbar` host lives here.
  */
@@ -147,14 +161,20 @@ fun FeedScreen(
 
     Box(Modifier.fillMaxSize().background(c.paper)) {
         Column(Modifier.fillMaxSize()) {
-            AppBarMain(onSaved = onOpenSaved, onSettings = onOpenSettings, busy = busy)
+            // One source of truth for the wordmark's motion and the refresh message (B18): the
+            // board is driven here, so the message can't outlive it even if the bar isn't shown.
+            val board = rememberFlapBoardState(busy)
+            AppBarMain(onSaved = onOpenSaved, onSettings = onOpenSettings, busy = busy, board = board)
             val pullState = rememberPullToRefreshState()
             // The pull reveals a `paper` panel holding the tiles from under the app bar and pushes
             // the list (chips first) down by as much, so the tiles never sit on the chips.
             val pulled = { pullState.distanceFraction.coerceIn(0f, 1f) }
             PullToRefreshBox(
-                isRefreshing = refreshing,
-                onRefresh = viewModel::refresh,
+                isRefreshing = refreshBandShown(refreshing, board),
+                onRefresh = {
+                    board.play()
+                    viewModel.refresh()
+                },
                 state = pullState,
                 modifier = Modifier.fillMaxSize().clipToBounds(),
                 indicator = {

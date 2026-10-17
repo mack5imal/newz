@@ -57,8 +57,9 @@ private fun AppBarSurface(
 
 /**
  * `AppBarMain` — the feed's app bar: the [FlapWordmark] "Newz" at the left and the Saved and
- * Settings [NavButton]s at the right, in a 64 dp row below the status bar. While [busy] (the feed
- * is loading or refreshing) the wordmark tiles flip.
+ * Settings [NavButton]s at the right, in a 64 dp row below the status bar. When [busy] (the feed
+ * is loading or refreshing) the wordmark tiles flip, driven by [board] (hoist it to share its
+ * timing, as the feed's refresh message does).
  */
 @Composable
 fun AppBarMain(
@@ -69,9 +70,10 @@ fun AppBarMain(
     wordmark: String = "Newz",
     savedLabel: String = "Saved",
     settingsLabel: String = "Settings",
+    board: FlapBoardState = rememberFlapBoardState(busy),
 ) {
     AppBarSurface(modifier, paddingStart = NewzTokens.spaceL, paddingEnd = NewzTokens.spaceXs) {
-        Box(Modifier.weight(1f)) { FlapWordmark(busy = busy, label = wordmark) }
+        Box(Modifier.weight(1f)) { FlapWordmark(busy = busy, label = wordmark, board = board) }
         NavButton(label = savedLabel, icon = NewzIcons.iconBookmark, onClick = onSaved)
         NavButton(label = settingsLabel, icon = NewzIcons.iconSettings, onClick = onSettings)
     }

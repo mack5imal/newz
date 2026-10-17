@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -33,6 +34,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
@@ -53,6 +55,7 @@ import app.newz.ui.components.CardActions
 import app.newz.ui.components.CardStrip
 import app.newz.ui.components.Checkbox
 import app.newz.ui.components.FlapAge
+import app.newz.ui.components.FlapBoardState
 import app.newz.ui.components.FlapTile
 import app.newz.ui.components.FlapWordmark
 import app.newz.ui.components.GroupButton
@@ -84,6 +87,8 @@ import app.newz.ui.components.TextField
 import app.newz.ui.components.TopicChip
 import app.newz.ui.components.TopicChipRow
 import app.newz.ui.components.TopicTiles
+import app.newz.ui.components.rememberFlapBoardState
+import app.newz.ui.feed.refreshBandShown
 import app.newz.ui.theme.LocalNewzPalette
 import app.newz.ui.theme.NewzIcons
 import app.newz.ui.theme.NewzTheme
@@ -383,6 +388,72 @@ class ComponentGalleryTest {
         assertEquals("NEWZ", wordmarkAfter(5_000))
     }
 
+    /** A feed-like bar: a wordmark and a stand-in refresh band sharing one hoisted board, as `FeedScreen` does. */
+    private fun setRefreshBar(): FlapBoardState {
+        composeRule.mainClock.autoAdvance = false
+        var hoisted: FlapBoardState? = null
+        setGallery {
+            val board = rememberFlapBoardState(wordmarkBusy).also { hoisted = it }
+            Column {
+                Box(Modifier.testTag(TAG_WORDMARK)) { FlapWordmark(busy = wordmarkBusy, board = board) }
+                if (refreshBandShown(wordmarkBusy, board)) Box(Modifier.testTag(TAG_BAND).size(BAND_DP.dp))
+            }
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        return checkNotNull(hoisted)
+    }
+
+    private fun bandShown() = composeRule.onAllNodesWithTag(TAG_BAND).fetchSemanticsNodes().isNotEmpty()
+
+    /** Steps the clock until the band hides; returns (ms until the tiles last landed on NEWZ, ms until the band hid). */
+    private fun runUntilBandHides(): Pair<Long, Long> {
+        var t = 0L
+        var landed = -1L
+        while (bandShown() && t < SETTLE_LIMIT_MS) {
+            val word = wordmarkAfter(STEP_MS)
+            t += STEP_MS
+            if (word != "NEWZ") {
+                landed = -1L
+            } else if (landed < 0) {
+                landed = t
+            }
+        }
+        assertFalse("band still up after $t ms", bandShown())
+        return landed to t
+    }
+
+    @Test
+    fun refreshBandAndWordmarkStopTogether() {
+        // B18: the "Refreshing your feed…" band shows from the pull until the tiles settle on NEWZ.
+        val board = setRefreshBar()
+        assertFalse(bandShown())
+        board.play() // the pull
+        wordmarkBusy = true
+        composeRule.mainClock.advanceTimeByFrame()
+        assertTrue(bandShown())
+        assertTrue(wordmarkAfter(200) != "NEWZ")
+        wordmarkBusy = false // a short refresh
+        val (landed, hidden) = runUntilBandHides()
+        // Counted from the end of the 200 ms refresh: a whole cycle is ~2.2 s from the pull.
+        assertTrue("band hid ${hidden + 200} ms after the pull, before a whole cycle", hidden + 200 >= 2_000)
+        assertTrue("tiles never settled", landed > 0)
+        assertTrue("tiles landed at $landed ms, band hid at $hidden ms", abs(hidden - landed) <= FLIP_MS)
+
+        // A long refresh: both persist for as long as it lasts, then stop together.
+        board.play()
+        wordmarkBusy = true
+        val seen = mutableSetOf<String>()
+        repeat(25) {
+            seen += wordmarkAfter(200)
+            assertTrue("band hid during a long refresh", bandShown())
+        }
+        assertTrue("tiles stopped during a long refresh: $seen", seen.size >= 5 && "NEWZ" in seen)
+        wordmarkBusy = false
+        val (landed2, hidden2) = runUntilBandHides()
+        assertTrue("tiles landed at $landed2 ms, band hid at $hidden2 ms", abs(hidden2 - landed2) <= FLIP_MS)
+        assertEquals("NEWZ", wordmarkAfter(3_000))
+    }
+
     @Test
     fun wordmarkStaysStillWhenNotBusy() {
         setWordmark()
@@ -587,6 +658,10 @@ class ComponentGalleryTest {
         const val TAG_WORDMARK = "wordmark"
         const val TAG_WORDMARK_BUSY = "wordmark-busy"
         const val FLIP_MS = 180L
+        const val STEP_MS = 60L
+        const val SETTLE_LIMIT_MS = 8_000L
+        const val TAG_BAND = "refresh-band"
+        const val BAND_DP = 10
         const val TAG_ROW_TWO_WORDS = "tiles-two-words"
         const val TAG_ROW_SMALL = "tiles-small"
         const val TAG_ROW_CUT = "tiles-cut"
