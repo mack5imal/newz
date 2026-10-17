@@ -16,6 +16,10 @@ const val CUSTOM_TOPIC_PREFIX = "custom:"
 
 fun customTopicId(word: String): String = CUSTOM_TOPIC_PREFIX + word
 
+/** The name [id] is shown under: a custom topic's word, else the catalog topic's name, else the id. */
+fun Catalog.topicDisplayName(id: String): String =
+    if (id.startsWith(CUSTOM_TOPIC_PREFIX)) id.removePrefix(CUSTOM_TOPIC_PREFIX) else topic(id)?.name ?: id
+
 /** Why [FeedFilter] keeps an article out of the feed, in the order the rules are checked. */
 enum class ExclusionReason {
     TOO_OLD,

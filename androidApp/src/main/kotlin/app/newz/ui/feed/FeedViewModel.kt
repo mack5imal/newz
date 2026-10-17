@@ -4,13 +4,13 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.newz.AppGraph
-import app.newz.catalog.PaywallStatus
+import app.newz.catalog.Catalog
 import app.newz.engine.FeedCard
 import app.newz.engine.FeedState
 import app.newz.feed.AgeFormatter
 import app.newz.feed.Article
-import app.newz.filter.CUSTOM_TOPIC_PREFIX
 import app.newz.filter.customTopicId
+import app.newz.filter.topicDisplayName
 import app.newz.store.Level
 import app.newz.store.UserPrefs
 import app.newz.store.flagPaywall
@@ -25,6 +25,7 @@ import app.newz.store.setLevel
 import app.newz.store.unflagPaywall
 import app.newz.store.unmuteKeyword
 import app.newz.ui.components.TagKind
+import app.newz.ui.components.tagKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -311,25 +312,16 @@ class FeedViewModel(
         messageState.value = null
     }
 
-    fun outletName(article: Article): String =
-        graph.catalog.outlet(article.outletId)?.name
-            ?: runCatching { URI(article.url).host?.removePrefix("www.") }.getOrNull()
-            ?: article.outletId
+    fun outletName(article: Article): String = graph.catalog.outletDisplayName(article.outletId, article.url)
 
-    fun topicName(id: String?): String =
-        when {
-            id == null -> ""
-            id.startsWith(CUSTOM_TOPIC_PREFIX) -> id.removePrefix(CUSTOM_TOPIC_PREFIX)
-            else -> graph.catalog.topic(id)?.name ?: id
-        }
+    fun topicName(id: String?): String = id?.let { graph.catalog.topicDisplayName(it) } ?: ""
 
     /** The outlet's catalog paywall tag for a story row (SPEC S12), or null. */
     fun paywallTag(article: Article): TagKind? =
-        when (graph.catalog.outlet(article.outletId)?.paywall) {
-            PaywallStatus.HARD -> TagKind.Paywall
-            PaywallStatus.METERED -> TagKind.Metered
-            else -> null
-        }
+        graph.catalog
+            .outlet(article.outletId)
+            ?.paywall
+            .tagKind()
 
     fun shortAge(article: Article): String = AgeFormatter.shortAge(article.date, graph.clock())
 
@@ -348,6 +340,15 @@ private fun FeedState.filtered(selected: Set<String>): FeedState =
     } else {
         this
     }
+
+/** The name an article's outlet is shown under: the catalog name, else the article URL's host, else the id. */
+fun Catalog.outletDisplayName(
+    outletId: String,
+    url: String,
+): String =
+    outlet(outletId)?.name
+        ?: runCatching { URI(url).host?.removePrefix("www.") }.getOrNull()
+        ?: outletId
 
 /** Joins names as the Copy does: "A", "A and B", "A, B and C" ([conjunction] "or" for the empty title). */
 fun joinTopics(

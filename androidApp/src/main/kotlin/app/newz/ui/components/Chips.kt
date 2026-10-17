@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import app.newz.catalog.PaywallStatus
 import app.newz.ui.theme.NewzIcons
 import app.newz.ui.theme.NewzTokens
 import app.newz.ui.theme.SignageText
@@ -123,6 +124,14 @@ enum class TagKind(
     Metered("Metered"),
     Following("Following"),
 }
+
+/** The tag an outlet row shows for its catalog paywall status (SPEC S12): `hard` → Paywall, `metered` → Metered. */
+fun PaywallStatus?.tagKind(): TagKind? =
+    when (this) {
+        PaywallStatus.HARD -> TagKind.Paywall
+        PaywallStatus.METERED -> TagKind.Metered
+        PaywallStatus.NONE, null -> null
+    }
 
 /** `Tag` — a small outline label: 24 tall, padding 0 7, a 1.5 dp `line` border, `radius-control`, `type-tag`. */
 @Composable

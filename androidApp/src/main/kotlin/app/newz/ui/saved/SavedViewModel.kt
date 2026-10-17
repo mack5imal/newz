@@ -7,10 +7,11 @@ import app.newz.AppGraph
 import app.newz.engine.EmptyReason
 import app.newz.engine.FeedState
 import app.newz.feed.AgeFormatter
-import app.newz.filter.CUSTOM_TOPIC_PREFIX
+import app.newz.filter.topicDisplayName
 import app.newz.store.SavedArticle
 import app.newz.store.StoredArticle
 import app.newz.ui.feed.FeedMessage
+import app.newz.ui.feed.outletDisplayName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,7 +22,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.URI
 
 /**
  * The Saved list (design `saved`, SPEC S21): every saved article from the store, newest saved
@@ -113,20 +113,11 @@ class SavedViewModel(
         messageState.value = null
     }
 
-    fun outletName(article: StoredArticle): String =
-        graph.catalog.outlet(article.outletId)?.name
-            ?: runCatching { URI(article.url).host?.removePrefix("www.") }.getOrNull()
-            ?: article.outletId
+    fun outletName(article: StoredArticle): String = graph.catalog.outletDisplayName(article.outletId, article.url)
 
     /** The topic shown on a card without an image: the article's first topic. */
-    fun topicName(article: StoredArticle): String {
-        val id = article.topics.firstOrNull() ?: return ""
-        return if (id.startsWith(CUSTOM_TOPIC_PREFIX)) {
-            id.removePrefix(CUSTOM_TOPIC_PREFIX)
-        } else {
-            graph.catalog.topic(id)?.name ?: id
-        }
-    }
+    fun topicName(article: StoredArticle): String =
+        article.topics.firstOrNull()?.let { graph.catalog.topicDisplayName(it) } ?: ""
 
     fun shortAge(article: StoredArticle): String = AgeFormatter.shortAge(article.publishedAt, graph.clock())
 

@@ -29,7 +29,7 @@ import app.newz.ui.components.NewzIcon
 import app.newz.ui.components.Panel
 import app.newz.ui.components.PlainText
 import app.newz.ui.components.Tag
-import app.newz.ui.components.TagKind
+import app.newz.ui.components.tagKind
 import app.newz.ui.nav.Screen
 import app.newz.ui.theme.LocalNewzPalette
 import app.newz.ui.theme.NewzIcons
@@ -229,11 +229,7 @@ private fun SourceRow(
                         color = c.ink,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                    when (source.paywall) {
-                        PaywallStatus.HARD -> Tag(TagKind.Paywall)
-                        PaywallStatus.METERED -> Tag(TagKind.Metered)
-                        PaywallStatus.NONE -> Unit
-                    }
+                    source.paywall.tagKind()?.let { Tag(it) }
                 }
                 sourceSubtitle(source)?.let {
                     PlainText(text = it, style = NewzTokens.typeRowSub, color = c.inkMuted)

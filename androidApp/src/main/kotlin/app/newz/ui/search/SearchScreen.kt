@@ -30,7 +30,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
-import app.newz.catalog.PaywallStatus
 import app.newz.discover.DiscoveryResult
 import app.newz.discover.OutletResult
 import app.newz.discover.TopicResult
@@ -47,6 +46,7 @@ import app.newz.ui.components.SearchField
 import app.newz.ui.components.StatePanel
 import app.newz.ui.components.Tag
 import app.newz.ui.components.TagKind
+import app.newz.ui.components.tagKind
 import app.newz.ui.nav.Screen
 import app.newz.ui.settings.ScreenFrame
 import app.newz.ui.theme.LocalNewzPalette
@@ -194,12 +194,7 @@ private fun OutletRow(
             },
         showDivider = showDivider,
         modifier = Modifier.testTag(SearchSemantics.outlet(result.outlet.id)),
-        tag =
-            when (result.outlet.paywall) {
-                PaywallStatus.HARD -> TagKind.Paywall
-                PaywallStatus.METERED -> TagKind.Metered
-                PaywallStatus.NONE -> null
-            },
+        tag = result.outlet.paywall.tagKind(),
         following = result.following && !result.removed,
         onFollow = onFollow,
     )

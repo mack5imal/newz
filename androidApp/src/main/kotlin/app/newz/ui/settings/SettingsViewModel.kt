@@ -8,6 +8,7 @@ import app.newz.catalog.CatalogFeed
 import app.newz.catalog.PaywallStatus
 import app.newz.filter.CUSTOM_TOPIC_PREFIX
 import app.newz.filter.customTopicId
+import app.newz.filter.topicDisplayName
 import app.newz.local.ZipResolver
 import app.newz.store.CustomFeed
 import app.newz.store.HiddenArticle
@@ -412,8 +413,7 @@ class SettingsViewModel(
                 ?.title
             ?: outletId
 
-    fun topicName(id: String): String =
-        if (id.startsWith(CUSTOM_TOPIC_PREFIX)) id.removePrefix(CUSTOM_TOPIC_PREFIX) else catalog.topic(id)?.name ?: id
+    fun topicName(id: String): String = catalog.topicDisplayName(id)
 
     fun dismissMessage() {
         messageState.value = null
