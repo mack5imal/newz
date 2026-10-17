@@ -16,6 +16,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.format
 import kotlinx.datetime.format.DateTimeComponents
@@ -37,7 +38,8 @@ data class TestItem(
  * A FeedRepository wired to an in-memory store and a counting MockEngine. Feeds `a`, `b`, `c`
  * (outlets of the same name, topic `world`) are served from [items]; a feed listed in
  * [failing] answers HTTP 500. While [gate] is set every request waits on it; a request to a feed
- * with an entry in [feedGates] also waits on that entry. [feedTopics] overrides a feed's topics.
+ * with an entry in [feedGates] also waits on that entry, and one with an entry in [feedDelays]
+ * answers after that many (real) milliseconds. [feedTopics] overrides a feed's topics.
  */
 class EngineHarness(
     feedIds: List<String> = listOf("a", "b", "c"),
@@ -74,6 +76,8 @@ class EngineHarness(
 
     val feedGates = ConcurrentHashMap<String, CompletableDeferred<Unit>>()
 
+    val feedDelays = ConcurrentHashMap<String, Long>()
+
     @Volatile var online = true
 
     /** Completed once [expected] requests have arrived. */
@@ -91,6 +95,7 @@ class EngineHarness(
                 gate?.await()
                 val feedId = feedIds.first { urlOf(it) == url }
                 feedGates[feedId]?.await()
+                feedDelays[feedId]?.let { delay(it) }
                 if (feedId in failing) {
                     respond("", HttpStatusCode.InternalServerError)
                 } else {

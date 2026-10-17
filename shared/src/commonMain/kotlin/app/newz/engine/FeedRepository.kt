@@ -12,6 +12,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +25,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /** Why the feed has no cards. */
@@ -64,7 +70,12 @@ sealed interface FeedState {
  * load merges into the served cards without moving or duplicating them. Preferences and the
  * hidden/saved/history tables are re-read at every composition. A preference change recomposes
  * from the cache at once; store-side changes do so through [invalidate].
+ *
+ * While a load grows the feed from nothing, landed feeds are coalesced: at most one recompose per
+ * [GROWING_PUBLISH_INTERVAL], plus one trailing recompose for feeds that landed meanwhile (B17).
+ * The finished load's publish never waits for them.
  */
+@OptIn(ExperimentalAtomicApi::class)
 class FeedRepository(
     private val scope: CoroutineScope,
     private val store: ArticleStore,
@@ -93,6 +104,25 @@ class FeedRepository(
     private var failing: Set<String> = emptySet()
     private var savedIds: Set<String> = emptySet()
     private var composedPrefs: UserPrefs? = null
+
+    private val composeCount = AtomicInt(0)
+
+    /** Compositions run so far, for tests that bound them (B17). */
+    internal val composes: Int get() = composeCount.load()
+
+    /** A request to republish while growing; conflated, so feeds landing meanwhile ask once. */
+    private val growingPublishes = Channel<Unit>(Channel.CONFLATED)
+
+    /** Serves [growingPublishes], then rests [GROWING_PUBLISH_INTERVAL]; started by the first request. */
+    private val growingPublisher: Job by lazy {
+        scope.launch {
+            for (request in growingPublishes) {
+                if (!lock.withLock { growing }) continue
+                publish(readSnapshot(), reset = true, loading = true, whileGrowing = true)
+                delay(GROWING_PUBLISH_INTERVAL)
+            }
+        }
+    }
 
     /** The cache-first start, launched in [scope] once so a cancelled collector cannot abort it. */
     private val startJob: Job by lazy { scope.launch { start() } }
@@ -189,13 +219,24 @@ class FeedRepository(
                 growing = true
                 userMoved = false
             }
-            publish(readSnapshot(), reset = true, loading = true)
+            requestGrowingPublish()
         } else if (lock.withLock { growing }) {
-            // A load that started with nothing on screen publishes as each feed lands, so one slow
-            // feed never holds back the others: it re-ranks until the user pages or acts on the
-            // feed, then merges. Loads over shown cards merge once, at the end.
-            publish(readSnapshot(), reset = true, loading = true, whileGrowing = true)
+            // A load that started with nothing on screen publishes as feeds land, so one slow feed
+            // never holds back the others: it re-ranks until the user pages or acts on the feed,
+            // then merges. Loads over shown cards merge once, at the end.
+            requestGrowingPublish()
         }
+    }
+
+    /**
+     * Asks [growingPublisher] to republish. It does so at once when idle, else once more after the
+     * running or last one plus [GROWING_PUBLISH_INTERVAL]: one compose of the whole cache per
+     * landed feed kept a first load of ~100 feeds busy for minutes (B17). Never waits, so the
+     * fetch keeps going.
+     */
+    private fun requestGrowingPublish() {
+        growingPublisher.start()
+        growingPublishes.trySend(Unit)
     }
 
     private suspend fun onLoaded(result: LoadResult) {
@@ -212,6 +253,7 @@ class FeedRepository(
         loading: Boolean,
         whileGrowing: Boolean = false,
     ) {
+        composeCount.incrementAndFetch()
         val groups = FeedComposer.compose(snapshot, catalog, clock())
         lock.withLock {
             if (whileGrowing && !growing) return
@@ -243,4 +285,9 @@ class FeedRepository(
             offline = offline,
             failingFeeds = failing,
         )
+
+    companion object {
+        /** The least time between two recomposes while a load grows the feed from nothing. */
+        val GROWING_PUBLISH_INTERVAL = 1.seconds
+    }
 }

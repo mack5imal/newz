@@ -7,13 +7,19 @@ import app.newz.store.UserPrefs
 import app.newz.store.muteKeyword
 import app.newz.store.muteTopic
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -22,6 +28,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.TimeSource
 
 class FeedRepositoryTest {
     private fun EngineHarness.cache(
@@ -305,4 +312,58 @@ class FeedRepositoryTest {
             assertEquals(mutedIds - target, after.cards.map { it.group.lead.id })
             assertEquals(requests, h.requests.values.sumOf { it.get() })
         }
+
+    /**
+     * B17: a first load of 100 feeds (50 articles each, landing over a few seconds) recomposes at
+     * most once per [FeedRepository.GROWING_PUBLISH_INTERVAL] plus a trailing one, not once per
+     * feed (which was 102 composes of the whole cache). Cards still show while feeds land, and the
+     * finished load publishes every feed. Real time: the coalescing waits on the clock.
+     */
+    @Test
+    fun aGrowingFirstLoadOfManyFeedsRecomposesAFewTimesNotOncePerFeed() =
+        runBlocking {
+            val ids = List(100) { "f$it" }
+            val h = EngineHarness(ids)
+            val random = Random(17)
+            val words = WORDS.split(' ')
+            ids.forEachIndexed { i, id ->
+                h.items[id] =
+                    (0 until 50).map { j ->
+                        val title = List(random.nextInt(5, 10)) { words.random(random) }.joinToString(" ")
+                        TestItem("$id-$j", title, age = ((i + j * 3) % 160 + 1).hours)
+                    }
+                h.feedDelays[id] = 100L + (i * 37) % 300
+            }
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            try {
+                val started = TimeSource.Monotonic.markNow()
+                val repo = h.repository(scope)
+                assertIs<FeedState.Content>(repo.feed.first { it is FeedState.Content })
+                assertTrue(repo.isLoading.value, "cards show while feeds are still landing")
+                repo.refresh().join()
+                val elapsed = started.elapsedNow()
+                val done = assertIs<FeedState.Content>(repo.feed.first())
+                assertEquals(FeedPager.DEFAULT_PAGE_SIZE, done.cards.size)
+                assertEquals(100 * 50, h.store.articles().size)
+                assertEquals(100, ids.sumOf(h::requestsTo))
+                val composes = repo.composes
+                // The start, one per interval while growing, a trailing one, and the finished load.
+                val bound = 3 + (elapsed / FeedRepository.GROWING_PUBLISH_INTERVAL).toInt() + 1
+                println("growing first load: $composes composes in $elapsed (bound $bound)")
+                assertTrue(composes <= bound, "$composes composes in $elapsed, bound $bound")
+            } finally {
+                scope.cancel()
+            }
+        }
+
+    private companion object {
+        const val WORDS =
+            "election vote court ruling judge strike union wage inflation rates market stocks bonds oil " +
+                "gas storm hurricane flood fire quake missile drone attack ceasefire talks summit deal " +
+                "tariff trade chip launch rocket satellite vaccine virus outbreak hospital school police " +
+                "arrest trial verdict appeal senate bill budget shutdown merger layoffs earnings profit " +
+                "record crash flight airport rail bridge outage heat drought prices housing rent bank " +
+                "Biden Trump Harris Putin Zelensky Macron Modi Musk Nvidia Apple Tesla Boeing Kyiv Gaza " +
+                "Taiwan Texas Florida Paris Berlin Tokyo Beijing Delhi Lagos Cairo Seoul Mexico Canada"
+    }
 }
