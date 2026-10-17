@@ -386,6 +386,9 @@ object NewzTokens {
     val savedActionsHeight = 52.dp
     val bottomBarPaddingBottom = 24.dp
     val appIconSize = 56.dp
+
+    // story-group `--many`: the sheet's top edge sits 92 dp down; its grabber area takes 18 dp more.
+    val storySheetTopGap = 110.dp
 }
 
 // region Icons

@@ -9,15 +9,22 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import app.newz.store.TextSize
+import app.newz.store.UserPrefs
+import app.newz.ui.feed.FeedScreen
+import app.newz.ui.feed.FeedViewModel
+import app.newz.ui.nav.NavHost
+import app.newz.ui.nav.PlaceholderScreen
+import app.newz.ui.nav.Screen
+import app.newz.ui.nav.rememberBackStack
 import app.newz.ui.theme.LocalNewzPalette
 import app.newz.ui.theme.NewzTheme
-import app.newz.ui.theme.NewzTokens
-import app.newz.ui.theme.SignageText
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,19 +35,37 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** The app shell: theme from the user's text size, then the back stack once preferences are read. */
 @Composable
-fun NewzApp(textSize: TextSize = TextSize.DEFAULT) {
-    NewzTheme(textSize = textSize) {
-        val palette = LocalNewzPalette.current
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(palette.paper)
-                    .safeDrawingPadding(),
-            contentAlignment = Alignment.Center,
-        ) {
-            SignageText("Newz", NewzTokens.typeWordmark, color = palette.ink)
+fun NewzApp(graph: AppGraph = remember { AppGraph.get() }) {
+    val prefs by graph.preferencesStore.prefs.collectAsState(initial = null)
+    NewzTheme(textSize = prefs?.textSize ?: TextSize.DEFAULT) {
+        Box(Modifier.fillMaxSize().background(LocalNewzPalette.current.paper)) {
+            prefs?.let { NewzNavigation(graph, it) }
+        }
+    }
+}
+
+@Composable
+private fun NewzNavigation(
+    graph: AppGraph,
+    prefs: UserPrefs,
+) {
+    val backStack = rememberBackStack(if (prefs.onboarded) Screen.Feed else Screen.Onboarding)
+    NavHost(backStack) { screen ->
+        when (screen) {
+            Screen.Feed -> {
+                val feedViewModel = viewModel { FeedViewModel(graph) }
+                FeedScreen(
+                    viewModel = feedViewModel,
+                    onOpenSaved = { backStack.push(Screen.Saved) },
+                    onOpenSettings = { backStack.push(Screen.Settings) },
+                )
+            }
+
+            else -> {
+                PlaceholderScreen(screen, onBack = backStack::pop)
+            }
         }
     }
 }

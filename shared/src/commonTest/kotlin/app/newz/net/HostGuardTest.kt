@@ -66,6 +66,12 @@ class HostGuardTest {
     }
 
     @Test
+    fun allowsLoopbackHostsTheUiTestFeedServerUses() {
+        assertFalse(HostGuard.isBlocked("http://127.0.0.1:41234/feed/0.xml"))
+        assertFalse(HostGuard.isBlocked("http://localhost:41234/img/3.png"))
+    }
+
+    @Test
     fun handlesUppercaseAndTrailingDots() {
         assertTrue(HostGuard.isBlocked("HTTPS://WWW.YOUTUBE.COM/watch"))
         assertTrue(HostGuard.isBlockedHost("FeedProxy.Google.COM"))

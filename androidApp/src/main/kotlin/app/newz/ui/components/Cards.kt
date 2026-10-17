@@ -2,6 +2,7 @@ package app.newz.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
@@ -38,6 +40,7 @@ import coil3.compose.AsyncImage
  * `type-headline` [headline] (padding 14 16, wraps, never truncated), an [ArticleImage] or
  * [NoImagePanel], then [CardActions]. Tapping anywhere outside its buttons calls [onOpen].
  * [groupCount] is the number of other outlets carrying the story (0 = not grouped).
+ * [onLongPress], when set, is the long-press shortcut to the card menu.
  */
 @Composable
 fun ArticleCard(
@@ -53,6 +56,7 @@ fun ArticleCard(
     spokenAge: String = spokenAgeOf(age),
     groupCount: Int = 0,
     onGroup: () -> Unit = {},
+    onLongPress: (() -> Unit)? = null,
     imageLoader: ImageLoader = rememberNewzImageLoader(),
 ) {
     val c = palette()
@@ -61,7 +65,7 @@ fun ArticleCard(
             modifier
                 .fillMaxWidth()
                 .background(c.card)
-                .clickable(onClick = onOpen),
+                .combinedClickable(onLongClick = onLongPress, onClick = onOpen),
     ) {
         CardStrip(outlet = outlet, age = age, spokenAge = spokenAge)
         PlainText(
@@ -75,13 +79,19 @@ fun ArticleCard(
                 ),
         )
         if (imageUrl != null) {
-            ArticleImage(url = imageUrl, imageLoader = imageLoader)
+            ArticleImage(url = imageUrl, imageLoader = imageLoader, modifier = Modifier.testTag(ARTICLE_IMAGE_TAG))
         } else {
-            NoImagePanel(topic = topic)
+            Box(Modifier.testTag(NO_IMAGE_TAG)) { NoImagePanel(topic = topic) }
         }
         CardActions(onShare = onShare, onMore = onMore, groupCount = groupCount, onGroup = onGroup)
     }
 }
+
+/** Test tag on an [ArticleCard]'s [ArticleImage]. */
+const val ARTICLE_IMAGE_TAG = "articleImage"
+
+/** Test tag on the box holding an [ArticleCard]'s [NoImagePanel]. */
+const val NO_IMAGE_TAG = "noImagePanel"
 
 /**
  * `CardStrip` — the header band of an [ArticleCard]: `strip`, min height 48, padding 0 8 0 14,
