@@ -39,21 +39,25 @@ import kotlinx.coroutines.delay
 /**
  * `Snackbar` — the Undo bar: it floats 12 from the sides and 24 from the bottom (place it at the
  * bottom of the screen), min height 60, padding 6 6 6 16, gap 12, `snackbar` background,
- * `type-message` in `on-snackbar`, `radius-control`, `shadow-snackbar`, and a [SnackbarAction].
- * When [onTimeout] is set it is called after `snackbar-timeout`.
+ * `type-message` in `on-snackbar`, `radius-control`, `shadow-snackbar`, and a [SnackbarAction]
+ * only when [actionLabel] is non-null (a plain confirmation such as "Reading history cleared" has none).
+ * When [onTimeout] is set it is called after `snackbar-timeout`. The timer restarts whenever
+ * [timeoutKey] changes; it defaults to [message], so callers that may show the same message twice
+ * in a row (e.g. "Article hidden") pass a per-event id to give each one a full window.
  */
 @Composable
 fun Snackbar(
     message: String,
-    actionLabel: String,
-    onAction: () -> Unit,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
     modifier: Modifier = Modifier,
     onTimeout: (() -> Unit)? = null,
+    timeoutKey: Any? = message,
 ) {
     val c = palette()
     if (onTimeout != null) {
         val timeout = rememberUpdatedState(onTimeout)
-        LaunchedEffect(message) {
+        LaunchedEffect(timeoutKey) {
             delay(NewzTokens.snackbarTimeout)
             timeout.value()
         }
@@ -86,7 +90,9 @@ fun Snackbar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         PlainText(text = message, style = NewzTokens.typeMessage, color = c.onSnackbar, modifier = Modifier.weight(1f))
-        SnackbarAction(label = actionLabel, onClick = onAction, color = c.onSnackbar)
+        if (actionLabel != null) {
+            SnackbarAction(label = actionLabel, onClick = onAction, color = c.onSnackbar)
+        }
     }
 }
 

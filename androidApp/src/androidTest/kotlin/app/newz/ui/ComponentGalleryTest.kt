@@ -20,10 +20,13 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasNoClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -141,6 +144,10 @@ class ComponentGalleryTest {
             .assert(hasNoClickAction())
             .assertIsNotEnabled()
         composeRule.onNodeWithTag(TAG_ENABLED_ROW).assert(hasClickAction())
+        composeRule.onNodeWithTag(TAG_PLAIN_SNACKBAR).assert(hasNoClickAction())
+        composeRule
+            .onAllNodes(hasClickAction() and hasAnyAncestor(hasTestTag(TAG_PLAIN_SNACKBAR)))
+            .assertCountEquals(0)
     }
 
     @Test
@@ -247,6 +254,7 @@ class ComponentGalleryTest {
             Button(text = "Wide", onClick = {}, wide = true)
             IconButton(icon = NewzIcons.iconShare, contentDescription = "Share", onClick = {})
             Snackbar(message = "Article hidden", actionLabel = "Undo", onAction = {})
+            Snackbar(message = "Reading history cleared", modifier = Modifier.testTag(TAG_PLAIN_SNACKBAR))
             SnackbarAction(label = "Retry", onClick = {})
             OfflineBanner(message = "Offline — showing saved articles", onRetry = {})
             StatePanel(
@@ -340,6 +348,7 @@ class ComponentGalleryTest {
         const val TAG_RANK = "rank"
         const val TAG_DISABLED_ROW = "sheet-row-disabled"
         const val TAG_ENABLED_ROW = "sheet-row-enabled"
+        const val TAG_PLAIN_SNACKBAR = "snackbar-plain"
         const val LONG_HEADLINE =
             "Deep-sea survey maps the currents carrying warm water toward Antarctica’s ice shelves, " +
                 "and scientists warn the melt could speed up sea-level rise along every coastline " +
