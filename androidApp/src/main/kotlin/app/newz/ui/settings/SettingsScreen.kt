@@ -51,6 +51,13 @@ private val TEXT_SIZE_LABELS = listOf("Small", "Default", "Large", "Extra large"
 private val ROW_TEXT_INSET = NewzTokens.spaceL + NewzTokens.iconSize + NewzTokens.spaceCardGap
 
 // design: settings
+// design: settings-sources
+// design: settings-topics
+// design: settings-hidden
+// The settings family shares SettingsFrame (below), so its four screen markers sit together here:
+// the screen check matches `settings` as a whole word, which a marker for a sub-screen id in its
+// own file would also satisfy. Sources, Topics and Hidden are built in SourcesScreen.kt,
+// TopicsScreen.kt and HiddenScreen.kt.
 
 /**
  * Settings home (design `settings`): Your feed, Reading and Your data panels. The Your feed rows
@@ -211,7 +218,7 @@ internal fun SettingsFrame(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val message by viewModel.message.collectAsState()
-    ScreenFrame(screen, title, message, viewModel::dismissMessage, onBack, trailing, content)
+    ScreenFrame(screen, title, message, viewModel::dismissMessage, onBack, trailing, content = content)
 }
 
 /** [SettingsFrame] for any screen with its own [message] (a `Snackbar`, cleared by [onDismissMessage]). */
@@ -223,6 +230,7 @@ internal fun ScreenFrame(
     onDismissMessage: () -> Unit,
     onBack: () -> Unit,
     trailing: (@Composable RowScope.() -> Unit)? = null,
+    titleContent: (@Composable RowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = LocalNewzPalette.current
@@ -233,7 +241,7 @@ internal fun ScreenFrame(
             .testTag(Screen.tagOf(screen)),
     ) {
         Column(Modifier.fillMaxSize()) {
-            AppBarSub(title = title, onBack = onBack, trailing = trailing)
+            AppBarSub(title = title, onBack = onBack, titleContent = titleContent, trailing = trailing)
             Column(
                 Modifier
                     .fillMaxSize()

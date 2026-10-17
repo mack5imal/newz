@@ -15,9 +15,13 @@ import androidx.test.core.app.ActivityScenario
 import app.newz.AppGraph
 import app.newz.MainActivity
 import app.newz.catalog.Catalog
+import app.newz.net.newzHttpClient
 import app.newz.store.UserPrefs
 import app.newz.ui.feed.FeedCardInfo
 import app.newz.ui.feed.FeedSemantics
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpSend
+import io.ktor.client.plugins.plugin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlin.time.Clock
@@ -25,7 +29,7 @@ import kotlin.time.Instant
 
 /**
  * Launch helpers for UI tests. [install] swaps the [AppGraph] (catalog, connectivity, Custom Tabs
- * provider, clock, a fresh in-memory database unless [keepDatabase]) and must run before
+ * provider, clock, HTTP client, a fresh in-memory database unless [keepDatabase]) and must run before
  * [launch]. Write preferences with [TestPrefs] after [install].
  */
 object TestApp {
@@ -35,6 +39,7 @@ object TestApp {
         customTabsProvider: () -> String? = { null },
         clock: () -> Instant = { Clock.System.now() },
         keepDatabase: Boolean = false,
+        httpClient: () -> HttpClient = { newzHttpClient() },
     ): AppGraph =
         AppGraph.override {
             this.catalog = catalog
@@ -43,9 +48,24 @@ object TestApp {
             this.clock = clock
             databaseName = null
             this.keepDatabase = keepDatabase
+            this.httpClient = httpClient
         }
 
     fun launch(): ActivityScenario<MainActivity> = ActivityScenario.launch(MainActivity::class.java)
+
+    /**
+     * The app's own guarded client with a counter behind the guard: [hosts] gets the host of
+     * every request the app actually sends (each redirect hop), nothing the guard refused.
+     */
+    fun recordingClient(hosts: MutableCollection<String>): () -> HttpClient =
+        {
+            newzHttpClient().also { client ->
+                client.plugin(HttpSend).intercept { request ->
+                    hosts.add(request.url.host)
+                    execute(request)
+                }
+            }
+        }
 }
 
 /** Every card the feed has served, in order (read off the list's semantics). */

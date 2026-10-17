@@ -27,6 +27,8 @@ import app.newz.ui.onboarding.OnboardingScreen
 import app.newz.ui.onboarding.OnboardingViewModel
 import app.newz.ui.saved.SavedScreen
 import app.newz.ui.saved.SavedViewModel
+import app.newz.ui.search.SearchScreen
+import app.newz.ui.search.SearchViewModel
 import app.newz.ui.settings.AboutScreen
 import app.newz.ui.settings.BackupScreen
 import app.newz.ui.settings.BackupViewModel
@@ -36,6 +38,8 @@ import app.newz.ui.settings.SettingsScreen
 import app.newz.ui.settings.SettingsViewModel
 import app.newz.ui.settings.SourcesScreen
 import app.newz.ui.settings.TopicsScreen
+import app.newz.ui.suggestions.SuggestionsScreen
+import app.newz.ui.suggestions.SuggestionsViewModel
 import app.newz.ui.theme.LocalNewzPalette
 import app.newz.ui.theme.NewzTheme
 
@@ -116,6 +120,18 @@ private fun NewzNavigation(
                     settings = viewModel { SettingsViewModel(graph) },
                     viewModel = viewModel { BackupViewModel(graph) },
                     onBack = backStack::pop,
+                )
+            }
+
+            Screen.Search -> {
+                SearchScreen(viewModel = viewModel { SearchViewModel(graph) }, onBack = backStack::pop)
+            }
+
+            Screen.Suggestions -> {
+                SuggestionsScreen(
+                    viewModel = viewModel { SuggestionsViewModel(graph) },
+                    onBack = backStack::pop,
+                    onFindSources = { backStack.push(Screen.Search) },
                 )
             }
 

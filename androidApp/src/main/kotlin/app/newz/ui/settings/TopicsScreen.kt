@@ -52,7 +52,7 @@ object TopicsSemantics {
     fun row(topicId: String): String = "topic:$topicId"
 }
 
-// design: settings-topics
+// Screen marker for `settings-topics` sits with the settings family in SettingsScreen.kt.
 
 /**
  * Topics & keywords (design `settings-topics`): Followed topics (× Unfollow with Undo, the level

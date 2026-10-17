@@ -7,6 +7,7 @@ import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import app.newz.catalog.Catalog
 import app.newz.catalog.CatalogLoader
 import app.newz.db.NewzDatabase
+import app.newz.discover.FeedDiscovery
 import app.newz.engine.FeedRepository
 import app.newz.engine.androidConnectivity
 import app.newz.net.newzHttpClient
@@ -73,6 +74,9 @@ class AppGraph private constructor(
         var customTabsProvider: () -> String? = base.customTabsProvider
         var databaseName: String? = base.databaseName
 
+        /** Builds the guarded HTTP client (a test wraps it to count the hosts the app contacts). */
+        var httpClient: () -> HttpClient = base.httpClient
+
         /** Keep the current graph's open database (and its cached articles) instead of opening [databaseName]. */
         var keepDatabase: Boolean = false
 
@@ -83,6 +87,7 @@ class AppGraph private constructor(
                 isOnline = isOnline,
                 customTabsProvider = customTabsProvider,
                 databaseName = databaseName,
+                httpClient = httpClient,
             )
     }
 
@@ -98,13 +103,29 @@ class AppGraph private constructor(
     val articleOpener: ArticleOpener = ArticleOpener(config.customTabsProvider)
     val shareLauncher: ShareLauncher = ShareLauncher()
 
+    /** The one guarded HTTP client the feed engine and search's address check share. */
+    private val httpClient: HttpClient by lazy { config.httpClient() }
+
+    /** Checks a typed web address for a feed (design `search`); nothing it sees is recorded. */
+    val feedDiscovery: FeedDiscovery by lazy {
+        val clock = config.clock
+        FeedDiscovery(
+            client = httpClient,
+            catalog = config.catalog,
+            clock =
+                object : Clock {
+                    override fun now(): Instant = clock()
+                },
+        )
+    }
+
     val feedRepository: FeedRepository by lazy {
         FeedRepository(
             scope = scope,
             store = articleStore,
             prefs = preferencesStore.prefs,
             catalog = config.catalog,
-            client = config.httpClient(),
+            client = httpClient,
             isOnline = config.isOnline,
             clock = config.clock,
         )

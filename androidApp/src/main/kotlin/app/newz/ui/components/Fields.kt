@@ -155,7 +155,7 @@ fun TextField(
 /**
  * `SearchField` — the field in the search app bar: a [TextField] with no label, 52 tall,
  * padding 0 0 0 14, a `field` fill and a border in `field` (light) or `line` (dark).
- * [placeholder] is also its spoken label.
+ * [description] is its spoken label (the [placeholder] unless given).
  */
 @Composable
 fun SearchField(
@@ -164,6 +164,7 @@ fun SearchField(
     placeholder: String,
     modifier: Modifier = Modifier,
     clearLabel: String = "Clear",
+    description: String = placeholder,
 ) {
     val c = palette()
     FieldBox(
@@ -173,7 +174,7 @@ fun SearchField(
         borderColor = if (c.isDark) c.line else c.field,
         paddingStart = NewzTokens.spaceCardGap,
         paddingEnd = null,
-        description = placeholder,
+        description = description,
         placeholder = placeholder,
         clearLabel = clearLabel,
         modifier = modifier,

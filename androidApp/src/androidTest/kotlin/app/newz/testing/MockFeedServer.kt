@@ -10,6 +10,7 @@ import okio.Buffer
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.net.InetAddress
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -81,6 +82,27 @@ class MockFeedServer(
     val feeds: List<FeedConfig> get() = configs
 
     fun feed(index: Int): FeedConfig = configs[index]
+
+    private val pages = ConcurrentHashMap<String, String>()
+
+    /** Serves [html] as a `text/html` page at [path] (a site page for search's address check). */
+    fun page(
+        path: String,
+        html: String,
+    ) {
+        pages[path] = html
+    }
+
+    /** A site page that declares feed [index] with `<link rel="alternate" type="application/rss+xml">`. */
+    fun sitePageWithFeed(
+        path: String,
+        index: Int,
+    ) = page(
+        path,
+        "<!doctype html><html><head><title>Site</title>" +
+            "<link rel=\"alternate\" type=\"application/rss+xml\" href=\"/feed/$index.xml\">" +
+            "</head><body>Hello</body></html>",
+    )
 
     /** Starts listening on 127.0.0.1 at a free port. */
     fun start(): MockFeedServer {
@@ -167,6 +189,13 @@ class MockFeedServer(
                         ).body(rss(index, config.items))
                 }
                 return builder.build()
+            }
+            pages[path]?.let { html ->
+                return MockResponse
+                    .Builder()
+                    .setHeader("Content-Type", "text/html; charset=utf-8")
+                    .body(html)
+                    .build()
             }
             if (IMAGE_PATH.matches(path)) {
                 return MockResponse

@@ -34,7 +34,7 @@ object HiddenSemantics {
 private const val HIDDEN_EMPTY_BODY =
     "When you choose Hide this article from an article’s ⋮ menu, it’s listed here so you can bring it back."
 
-// design: settings-hidden
+// Screen marker for `settings-hidden` sits with the settings family in SettingsScreen.kt.
 
 /**
  * Hidden articles (design `settings-hidden`, SPEC S7): an intro, then Panel "Hidden" with every

@@ -47,7 +47,7 @@ object SourcesSemantics {
     const val REMOVED_PANEL = "panel:removed"
 }
 
-// design: settings-sources
+// Screen marker for `settings-sources` sits with the settings family in SettingsScreen.kt.
 
 /**
  * Sources (design `settings-sources`): Following (failing feeds pinned first with Retry and
