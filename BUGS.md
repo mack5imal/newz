@@ -25,6 +25,8 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
   contacts Google; no third-party cookies; same blocked-host rules as the feed.
 - **Status:** deferred (2026-10-17). Kept Custom Tabs; to be tried on a real phone and then decide on an in-app reader.
 
+## Fixed
+
 ### B12 — "Change it in Settings" doesn't say where
 - **Severity:** Medium
 - **Where:** `FeedViewModel` show more/less message; Settings home's "Topics & keywords" row
@@ -36,16 +38,19 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
   name to fit two lines, and the Settings row's subtitle only shows counts.
 - **Fix idea:** message names "Settings › Topics" (fits); the Topics & keywords row subtitle
   mentions how often each topic appears.
+- **Fixed in:** `79b70b7` — message now "{Topic}: {Level} (2× as often). Change it in Settings › Topics." (fits two lines for every built-in topic); the Topics & keywords row reads "{n} topics · set how often each appears".
 
 ### B13 — Clear reading history button too big
 - **Severity:** Low
 - **Where:** `SettingsScreen.kt:159`
 - **Requested:** a smaller button, centred.
+- **Fixed in:** `7ec560c` — compact button, centred, still a 48 dp touch target.
 
 ### B14 — Placeholder topic tiles are left-aligned
 - **Severity:** Low
 - **Where:** `NoImagePanel` / `TopicTiles` in `ui/components/Cards.kt`
 - **Requested:** centre the tiles in the panel (screenshot 12:52).
+- **Fixed in:** `1c65c69` — tiles centred across the panel.
 
 ### B15 — Use the flap-tile NEWZ as the top-bar wordmark
 - **Severity:** Low (design change)
@@ -53,13 +58,13 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 - **Requested:** replace the plain "NEWZ" wordmark with the split-flap NEWZ tiles (matches the
   app icon), colours adjusted to suit the bar; the pull-to-refresh band shows a plain message
   such as "Refreshing feed…" instead of the tiles.
+- **Fixed in:** `ade9b86` — NEWZ flap-tile wordmark (light tiles, navy letters) in the top bar and onboarding; it flips while the feed loads or refreshes; the pull band says "Refreshing your feed…".
 
 ### B16 — Theme setting (System / Light / Dark)
 - **Severity:** Low (feature request)
 - **Where:** `ui/theme/NewzTheme.kt` (follows the system today), Settings, `UserPrefs`
 - **Requested:** a Settings choice of System, Light or Dark.
-
-## Fixed
+- **Fixed in:** `35e0a5f` — Settings › Reading › Theme: System / Light / Dark, applied at once (also article tabs and nav-bar icons).
 
 ### B2 — Running the UI tests overwrites the device's real settings
 - **Severity:** Medium (test tooling; the app itself is fine)
@@ -107,7 +112,7 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 - **Fix idea:** prefer the largest declared image; treat images under ~300 px wide as too small
   (fall back to the placeholder, or to the article page's `og:image` from the same publisher);
   possibly a per-outlet URL rewrite for known thumbnail paths.
-- **Fixed in:** `3ebf8d1` (pictures under 300 px wide show the flap tiles) and `5a05e9c` (opt-in Settings › Reading › Better pictures from article pages, off by default; reads the start of the page for `og:image`).
+- **Fixed in:** `3ebf8d1` (pictures under 300 px wide show the flap tiles) and `5a05e9c` (opt-in Settings › Reading › Better pictures from article pages, off by default; reads the start of the page for `og:image`). `73324fe` asks servers for only the first 64 KB (`Range`), with fallbacks: range ignored → stop reading at 64 KB; 416/400/403 → one retry without it; a cut-off compressed reply → use what decoded.
 
 ### B6 — Photos are cropped badly (heads cut off)
 - **Severity:** Medium
