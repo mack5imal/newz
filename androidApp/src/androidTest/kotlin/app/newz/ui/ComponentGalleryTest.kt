@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
@@ -36,6 +37,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.newz.store.TextSize
+import app.newz.ui.components.ARTICLE_IMAGE_TAG
 import app.newz.ui.components.AppBarMain
 import app.newz.ui.components.AppBarSub
 import app.newz.ui.components.AppIcon
@@ -55,6 +57,7 @@ import app.newz.ui.components.GroupButton
 import app.newz.ui.components.IconButton
 import app.newz.ui.components.ListRow
 import app.newz.ui.components.LoadingBoard
+import app.newz.ui.components.NO_IMAGE_TAG
 import app.newz.ui.components.NavButton
 import app.newz.ui.components.NoImagePanel
 import app.newz.ui.components.NoteRow
@@ -78,6 +81,7 @@ import app.newz.ui.components.TagKind
 import app.newz.ui.components.TextField
 import app.newz.ui.components.TopicChip
 import app.newz.ui.components.TopicChipRow
+import app.newz.ui.components.TopicTiles
 import app.newz.ui.theme.LocalNewzPalette
 import app.newz.ui.theme.NewzIcons
 import app.newz.ui.theme.NewzTheme
@@ -209,6 +213,118 @@ class ComponentGalleryTest {
         assertTrue("outlet is ${outlet.size.height}px tall", outlet.size.height <= px(OUTLET_MAX_HEIGHT))
     }
 
+    /** One letter tile of a [TopicTiles] row: its character, where it sits, and its font size in sp. */
+    private data class Letter(
+        val text: String,
+        val left: Float,
+        val right: Float,
+        val fontSize: Float,
+    )
+
+    /**
+     * The letters drawn inside the node tagged [tag], left to right. Both tile sizes are composed,
+     * so tiles that were not placed (the size not used, or cut off) are skipped.
+     */
+    private fun lettersIn(tag: String): List<Letter> =
+        composeRule
+            .onAllNodes(hasAnyAncestor(hasTestTag(tag)) and hasTextLayout(), useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .filter { node -> generateSequence(node.layoutInfo) { it.parentInfo }.all { it.isPlaced } }
+            .map { node ->
+                val layouts = mutableListOf<TextLayoutResult>()
+                node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+                Letter(
+                    text = node.config[SemanticsProperties.Text].joinToString("") { it.text },
+                    left = node.boundsInRoot.left,
+                    right = node.boundsInRoot.right,
+                    fontSize =
+                        layouts
+                            .single()
+                            .layoutInput.style.fontSize.value,
+                )
+            }.sortedBy { it.left }
+
+    private fun hasTextLayout() = SemanticsMatcher.keyIsDefined(SemanticsActions.GetTextLayoutResult)
+
+    @Composable
+    private fun TileRow(
+        topic: String,
+        tag: String,
+    ) {
+        Box(Modifier.width(TILE_ROW_WIDTH.dp).testTag(tag)) { TopicTiles(topic = topic) }
+    }
+
+    @Test
+    fun noImageTilesSpellTheTopicWithSpacesAsGaps() {
+        setGallery {
+            Column {
+                TileRow(topic = "Tech", tag = TAG_ROW_SHORT)
+                TileRow(topic = "Go Far", tag = TAG_ROW_TWO_WORDS)
+            }
+        }
+        val short = lettersIn(TAG_ROW_SHORT)
+        assertEquals("TECH", short.joinToString("") { it.text })
+        val twoWords = lettersIn(TAG_ROW_TWO_WORDS)
+        assertEquals("GOFAR", twoWords.joinToString("") { it.text })
+        // Same full-size tiles in both rows; the space leaves one blank tile between O and F.
+        assertTrue(twoWords.all { it.fontSize == short.first().fontSize })
+        val step = twoWords[1].left - twoWords[0].left
+        val gap = twoWords[2].left - twoWords[1].left
+        assertTrue("space gap $gap vs letter step $step", gap > step * 1.5f)
+    }
+
+    @Test
+    fun longTopicFallsBackToSmallTilesThenCutsAtAWholeLetter_extraLarge() {
+        textSize = TextSize.EXTRA_LARGE
+        setGallery {
+            Column {
+                TileRow(topic = "Tech", tag = TAG_ROW_SHORT)
+                TileRow(topic = "Science", tag = TAG_ROW_SMALL)
+                TileRow(topic = "Entertainment", tag = TAG_ROW_CUT)
+            }
+        }
+        val full = lettersIn(TAG_ROW_SHORT).first().fontSize
+        val rowRight =
+            composeRule
+                .onNodeWithTag(TAG_ROW_CUT)
+                .fetchSemanticsNode()
+                .boundsInRoot.right
+
+        // "SCIENCE" is too wide for full-size tiles here, so it is drawn whole in small ones.
+        val small = lettersIn(TAG_ROW_SMALL)
+        assertEquals("SCIENCE", small.joinToString("") { it.text })
+        assertTrue("small ${small.first().fontSize} vs full $full", small.all { it.fontSize < full })
+
+        // "ENTERTAINMENT" doesn't fit even in small tiles: it stops at a whole letter, inside the row.
+        val cut = lettersIn(TAG_ROW_CUT)
+        val word = cut.joinToString("") { it.text }
+        assertTrue("cut word '$word'", word.length in 1 until "ENTERTAINMENT".length)
+        assertTrue("cut word '$word'", "ENTERTAINMENT".startsWith(word))
+        assertTrue(cut.all { it.fontSize < full })
+        assertTrue("last letter ends at ${cut.last().right} > $rowRight", cut.last().right <= rowRight)
+    }
+
+    @Test
+    fun failedImageLoadShowsTheDecorativeTopicPanel() {
+        setGallery {
+            Column {
+                // A blocked host fails before any request, like a picture that can't be fetched.
+                ArticleImage(url = GOOGLE_IMAGE, topic = "World")
+            }
+        }
+        composeRule.waitUntil(IMAGE_TIMEOUT_MS) {
+            composeRule.onAllNodes(hasTestTag(NO_IMAGE_TAG)).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onAllNodes(hasTestTag(ARTICLE_IMAGE_TAG)).assertCountEquals(0)
+        val panel = composeRule.onNodeWithTag(NO_IMAGE_TAG).fetchSemanticsNode()
+        assertEquals(with(composeRule.density) { NO_IMAGE_HEIGHT.dp.roundToPx() }, panel.size.height)
+        // Decorative: the tiles are drawn (in the unmerged tree) but hidden from screen readers.
+        composeRule
+            .onAllNodes(hasAnyAncestor(hasTestTag(NO_IMAGE_TAG)) and hasTextLayout(), useUnmergedTree = true)
+            .assertCountEquals(2 * "WORLD".length)
+        composeRule.onAllNodes(hasAnyAncestor(hasTestTag(NO_IMAGE_TAG)) and hasTextLayout()).assertCountEquals(0)
+    }
+
     @Composable
     private fun Gallery() {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
@@ -250,7 +366,7 @@ class ComponentGalleryTest {
                 onMore = {},
             )
             CardStrip(outlet = "Open Circuit", age = "5m")
-            ArticleImage(url = GOOGLE_IMAGE)
+            ArticleImage(url = GOOGLE_IMAGE, topic = "World")
             NoImagePanel(topic = "Science")
             CardActions(onShare = {}, onMore = {}, groupCount = 1, onGroup = {})
             GroupButton(count = 1, onClick = {}, modifier = Modifier.testTag(TAG_GROUP_ONE))
@@ -370,6 +486,13 @@ class ComponentGalleryTest {
 
     private companion object {
         const val GOOGLE_IMAGE = "https://lh3.googleusercontent.com/x.jpg"
+        const val TILE_ROW_WIDTH = 176
+        const val NO_IMAGE_HEIGHT = 104
+        const val IMAGE_TIMEOUT_MS = 5_000L
+        const val TAG_ROW_SHORT = "tiles-short"
+        const val TAG_ROW_TWO_WORDS = "tiles-two-words"
+        const val TAG_ROW_SMALL = "tiles-small"
+        const val TAG_ROW_CUT = "tiles-cut"
         const val SHEET_BOX_HEIGHT = 360
         const val TAG_GROUP_ONE = "group-1"
         const val TAG_GROUP_THREE = "group-3"

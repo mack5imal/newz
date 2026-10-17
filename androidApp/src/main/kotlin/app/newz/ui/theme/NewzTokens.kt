@@ -259,7 +259,6 @@ object NewzTokens {
     val typeSegment = signage(FontWeight.Bold, 16.sp, 16.sp, 0.05.em)
     val typeTag = signage(FontWeight.Bold, 14.sp, tracking = 0.08.em)
     val typeTile = signage(FontWeight.ExtraBold, 24.sp)
-    val typeTileDisplay = signage(FontWeight.ExtraBold, 128.sp, tracking = 0.02.em)
     val typeHeadline = text(FontWeight.Bold, 21.sp, 27.sp, (-0.01).em)
     val typeHeading = text(FontWeight.Bold, 24.sp, 30.sp)
     val typeBody = text(FontWeight.Normal, 16.sp, 24.sp)
@@ -368,7 +367,6 @@ object NewzTokens {
     val stripPaddingXl = 10.dp
     val tileRuleOffset = 15.dp
     val tileRuleOffsetSmall = 11.dp
-    val noImageBaselineDrop = 26.dp
     val groupButtonPaddingH = 14.dp
     val groupButtonGap = 10.dp
     val snackbarPadding = 6.dp

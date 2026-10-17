@@ -16,25 +16,29 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import app.newz.ui.image.rememberNewzImageLoader
 import app.newz.ui.theme.NewzIcons
 import app.newz.ui.theme.NewzTokens
-import app.newz.ui.theme.NewzType
 import app.newz.ui.theme.SignageText
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
 
 /**
  * `ArticleCard` — one article in the feed: a `card` surface with a [CardStrip], the
@@ -80,18 +84,21 @@ fun ArticleCard(
                 ),
         )
         if (imageUrl != null) {
-            ArticleImage(url = imageUrl, imageLoader = imageLoader, modifier = Modifier.testTag(ARTICLE_IMAGE_TAG))
+            ArticleImage(url = imageUrl, topic = topic, imageLoader = imageLoader)
         } else {
-            Box(Modifier.testTag(NO_IMAGE_TAG)) { NoImagePanel(topic = topic) }
+            NoImagePanel(topic = topic)
         }
         CardActions(onShare = onShare, onMore = onMore, groupCount = groupCount, onGroup = onGroup)
     }
 }
 
-/** Test tag on an [ArticleCard]'s [ArticleImage]. */
+/**
+ * Test tag on an [ArticleImage] while it shows its picture or the loading hatch. Set inside the
+ * component, so a caller's own `testTag` replaces it.
+ */
 const val ARTICLE_IMAGE_TAG = "articleImage"
 
-/** Test tag on the box holding an [ArticleCard]'s [NoImagePanel]. */
+/** Test tag on every [NoImagePanel], including one an [ArticleImage] falls back to; set like [ARTICLE_IMAGE_TAG]. */
 const val NO_IMAGE_TAG = "noImagePanel"
 
 /**
@@ -132,21 +139,43 @@ fun CardStrip(
 internal val PhotoAlignment = BiasAlignment(horizontalBias = 0f, verticalBias = -0.5f)
 
 /**
+ * What an [ArticleImage] shows: the hatch while [Loading], the photo once [Shown], and a
+ * [NoImagePanel] for [NoPicture] — the state for any picture that turns out unusable.
+ */
+private enum class PictureState { Loading, Shown, NoPicture }
+
+/** The [PictureState] for Coil's [state]: a load that fails (or whose host is blocked) has no picture. */
+private fun pictureStateOf(state: AsyncImagePainter.State): PictureState =
+    when (state) {
+        is AsyncImagePainter.State.Success -> PictureState.Shown
+        is AsyncImagePainter.State.Error -> PictureState.NoPicture
+        else -> PictureState.Loading
+    }
+
+/**
  * `ArticleImage` — the article photo at full width and 16:9, cropped to fill (anchored by
- * [PhotoAlignment], so tall photos keep their top). It shows the
- * `image-placeholder` with `image-hatch` lines every 11 dp until it loads and keeps it if loading
- * fails. Loaded only through the guarded [imageLoader].
+ * [PhotoAlignment], so tall photos keep their top). It shows the `image-placeholder` with
+ * `image-hatch` lines every 11 dp until it loads; if loading fails or the host is blocked it is
+ * replaced by the [NoImagePanel] for [topic], so a failed picture looks the same as none.
+ * Loaded only through the guarded [imageLoader].
  */
 @Composable
 fun ArticleImage(
     url: String,
+    topic: String,
     modifier: Modifier = Modifier,
     contentDescription: String = "Article image",
     imageLoader: ImageLoader = rememberNewzImageLoader(),
 ) {
     val c = palette()
+    var picture by remember(url) { mutableStateOf(PictureState.Loading) }
+    if (picture == PictureState.NoPicture) {
+        NoImagePanel(topic = topic, modifier = modifier)
+        return
+    }
     Box(
         modifier
+            .testTag(ARTICLE_IMAGE_TAG)
             .fillMaxWidth()
             .aspectRatio(NewzTokens.imageRatio)
             .clipToBounds()
@@ -158,42 +187,57 @@ fun ArticleImage(
             imageLoader = imageLoader,
             contentScale = ContentScale.Crop,
             alignment = PhotoAlignment,
+            onState = { picture = pictureStateOf(it) },
             modifier = Modifier.matchParentSize(),
         )
     }
 }
 
-/** A word drawn in [style] with its baseline [drop] below the bottom of a [height]-tall box, so it is cropped. */
+/**
+ * The letters of [topic] as one row of [FlapTile]s, a space as a blank tile-wide gap, gap 3
+ * between. Full-size tiles when the whole word fits the width; otherwise small tiles, cut after
+ * the last whole tile that fits.
+ */
 @Composable
-private fun CroppedWord(
-    word: String,
-    style: NewzType,
-    height: Dp,
-    inset: Dp,
-    drop: Dp,
+internal fun TopicTiles(
+    topic: String,
     modifier: Modifier = Modifier,
 ) {
-    val c = palette()
-    Layout(
-        content = {
-            Text(text = word.uppercase(), color = c.sky, style = style.textStyle, softWrap = false)
-        },
-        modifier = modifier.clipToBounds().clearAndSetSemantics { },
-    ) { measurables, constraints ->
-        val placeable = measurables.first().measure(Constraints())
-        val h = height.roundToPx()
-        val w = if (constraints.hasBoundedWidth) constraints.maxWidth else placeable.width
-        val baseline = placeable[FirstBaseline].takeIf { it > 0 } ?: placeable.height
-        layout(w, h) {
-            placeable.place(x = inset.roundToPx(), y = h + drop.roundToPx() - baseline)
+    val word = topic.trim()
+    val row = { small: Boolean ->
+        @Composable {
+            val blank = if (small) NewzTokens.tileSizeSmall else NewzTokens.tileSize
+            word.forEach { ch ->
+                if (ch.isWhitespace()) Spacer(Modifier.size(blank)) else FlapTile(text = ch.toString(), small = small)
+            }
+        }
+    }
+    Layout(contents = listOf(row(false), row(true)), modifier = modifier) { (full, small), constraints ->
+        val gap = NewzTokens.tileGap.roundToPx()
+        val maxWidth = constraints.maxWidth
+        val fullTiles = full.map { it.measure(Constraints()) }
+        val fullWidth = fullTiles.sumOf { it.width } + gap * (fullTiles.size - 1).coerceAtLeast(0)
+        val tiles = if (fullWidth <= maxWidth) fullTiles else small.map { it.measure(Constraints()) }
+        val xs = mutableListOf<Int>()
+        var x = 0
+        for (tile in tiles) {
+            if (x + tile.width > maxWidth) break
+            xs += x
+            x += tile.width + gap
+        }
+        val height = tiles.maxOfOrNull { it.height } ?: 0
+        layout(constraints.constrainWidth((x - gap).coerceAtLeast(0)), constraints.constrainHeight(height)) {
+            xs.forEachIndexed { i, tileX -> tiles[i].place(tileX, (height - tiles[i].height) / 2) }
         }
     }
 }
 
 /**
- * `NoImagePanel` — replaces [ArticleImage] when there is no image: a 104 dp `strip` panel with
- * the first [topic] in `type-tile-display` `sky`, 12 from the left, its baseline 26 dp below the
- * bottom edge so the word is cropped. Decorative: hidden from screen readers.
+ * `NoImagePanel` — replaces [ArticleImage] when there is no picture (none in the feed, or it
+ * failed to load): a 104 dp `strip` panel with the first [topic] spelled in [FlapTile]s, 12 from
+ * the left and centred top to bottom. A word too long for full-size tiles uses small ones and is
+ * cut at a whole letter if still too long. The tiles keep their size at every text size.
+ * Decorative: hidden from screen readers.
  */
 @Composable
 fun NoImagePanel(
@@ -201,14 +245,18 @@ fun NoImagePanel(
     modifier: Modifier = Modifier,
 ) {
     val c = palette()
-    CroppedWord(
-        word = topic,
-        style = NewzTokens.typeTileDisplay,
-        height = NewzTokens.noImageHeight,
-        inset = NewzTokens.spaceM,
-        drop = NewzTokens.noImageBaselineDrop,
-        modifier = modifier.fillMaxWidth().background(c.strip),
-    )
+    Box(
+        modifier =
+            modifier
+                .testTag(NO_IMAGE_TAG)
+                .fillMaxWidth()
+                .height(NewzTokens.noImageHeight)
+                .background(c.strip)
+                .padding(horizontal = NewzTokens.spaceM),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        TopicTiles(topic = topic, modifier = Modifier.clearAndSetSemantics { })
+    }
 }
 
 /**
