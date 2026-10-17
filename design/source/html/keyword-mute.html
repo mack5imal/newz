@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Newz — mute a keyword, suggestion picked</title>
+
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="newz.css">
+<style>
+body{margin:0}
+a{color:#1D3A5F}a:hover{color:#33557F}
+</style>
+</head>
+<body>
+<div class="nz">
+<header class="ab"><div class="abr"><span class="wm">Newz</span><div style="display: flex"><button class="nb"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"></path></svg>Saved</button><button class="nb"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"></path><circle cx="15" cy="7" r="2"></circle><circle cx="9" cy="17" r="2"></circle></svg>Settings</button></div></div></header>
+<div class="split" aria-hidden="true"></div>
+<nav class="chips" aria-label="Topics"><button class="chip" aria-pressed="false">World</button><button class="chip" aria-pressed="false">Science</button><button class="chip" aria-pressed="false">Climate</button><button class="chip" aria-pressed="false">Tech</button><button class="chip" aria-pressed="false">Business</button></nav>
+<main class="feed">
+<article class="card">
+<div class="strip"><span class="out">The Harbor Ledger</span><span class="flap" role="img" aria-label="2 hours ago"><span class="t">2</span><span class="t">h</span></span></div>
+<h2 class="hl">Deep-sea survey maps the currents carrying warm water toward Antarctica’s ice shelves</h2>
+<div class="img" role="img" aria-label="Article image"></div>
+</article>
+</main>
+<div class="scrim" aria-hidden="true"></div>
+<section class="sheet" role="dialog" aria-labelledby="km-title" style="padding: 0 20px 24px">
+<div class="grab" aria-hidden="true"></div>
+<h2 class="sht" id="km-title" style="margin-top: 10px">Mute a keyword</h2>
+<p class="rs" style="margin: 6px 0 18px; font-size: 15px; line-height: 22px">Articles that mention it are hidden everywhere in your feed. You can undo this in Settings › Topics &amp; keywords.</p>
+<span class="lbl">From this headline</span>
+<div class="wrap" style="margin-bottom: 20px"><button class="chip" aria-pressed="false">Deep-sea</button><button class="chip" aria-pressed="false">Currents</button><button class="chip on" aria-pressed="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Antarctica</button><button class="chip" aria-pressed="false">Ice shelves</button><button class="chip" aria-pressed="false">Warm water</button></div>
+<label class="lbl" for="kw">Keyword or name</label>
+<div class="tf"><input id="kw" type="text" value="Antarctica"><button class="ib" aria-label="Clear"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>
+<div class="help"><span>Matches the whole word, in any capitalization</span><span>10/60</span></div>
+<div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px"><button class="btn tx">Cancel</button><button class="btn">Mute</button></div>
+</section>
+</div>
+</body>
+</html>

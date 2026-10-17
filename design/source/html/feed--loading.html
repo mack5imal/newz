@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Newz — feed, first load</title>
+
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="newz.css">
+<style>
+body{margin:0}
+a{color:#1D3A5F}a:hover{color:#33557F}
+</style>
+</head>
+<body>
+<div class="nz">
+<header class="ab"><div class="abr"><span class="wm">Newz</span><div style="display: flex"><button class="nb"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"></path></svg>Saved</button><button class="nb"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"></path><circle cx="15" cy="7" r="2"></circle><circle cx="9" cy="17" r="2"></circle></svg>Settings</button></div></div></header>
+<div class="split" aria-hidden="true"></div>
+<nav class="chips" aria-label="Topics"><button class="chip" aria-pressed="false">World</button><button class="chip" aria-pressed="false">Science</button><button class="chip" aria-pressed="false">Climate</button><button class="chip" aria-pressed="false">Tech</button><button class="chip" aria-pressed="false">Business</button><button class="chip" aria-pressed="false">Health</button><button class="chip" aria-pressed="false">Seattle</button></nav>
+<main class="feed">
+<div role="status" style="display: flex; align-items: center; gap: 14px; padding: 4px 4px 2px">
+<span class="flap" aria-hidden="true"><span class="t">N</span><span class="t">E</span><span class="t">W</span><span class="t"></span></span>
+<span class="rt">Loading today’s news…</span>
+</div>
+<article class="card" aria-hidden="true">
+<div class="strip"><span class="sk" style="width: 150px; height: 12px; background: var(--tile)"></span><span class="flap"><span class="t"></span><span class="t"></span></span></div>
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 18px 16px"><span class="sk" style="width: 92%; height: 16px"></span><span class="sk" style="width: 76%; height: 16px"></span><span class="sk" style="width: 38%; height: 16px"></span></div>
+<span class="sk" style="height: 218px"></span>
+<div style="height: 64px"></div>
+</article>
+<article class="card" aria-hidden="true">
+<div class="strip"><span class="sk" style="width: 110px; height: 12px; background: var(--tile)"></span><span class="flap"><span class="t"></span><span class="t"></span><span class="t"></span></span></div>
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 18px 16px"><span class="sk" style="width: 88%; height: 16px"></span><span class="sk" style="width: 60%; height: 16px"></span></div>
+<span class="sk" style="height: 218px"></span>
+</article>
+</main>
+</div>
+</body>
+</html>
