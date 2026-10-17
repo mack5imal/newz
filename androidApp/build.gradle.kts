@@ -1,12 +1,24 @@
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedComponentResult
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.compiler)
 }
+
+// Release signing reads the project-local key made by scripts/make-release-key.sh
+// (keystore/ is gitignored). Without it, only release packaging fails, so debug
+// builds, tests and lint still work on a fresh checkout.
+val keystoreDir = rootProject.layout.projectDirectory.dir("keystore")
+val keystorePropertiesFile = keystoreDir.file("keystore.properties").asFile
+val keystoreProperties =
+    Properties().apply {
+        if (keystorePropertiesFile.isFile) keystorePropertiesFile.inputStream().use { load(it) }
+    }
+val hasReleaseKey = keystorePropertiesFile.isFile
 
 android {
     namespace = "app.newz"
@@ -30,9 +42,28 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            if (hasReleaseKey) {
+                storeFile = keystoreDir.file(keystoreProperties.getProperty("storeFile")).asFile
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            if (hasReleaseKey) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
@@ -126,3 +157,16 @@ val verifyNoGoogleServices by tasks.registering {
 }
 
 tasks.named("check") { dependsOn(verifyNoGoogleServices) }
+
+if (!hasReleaseKey) {
+    tasks
+        .matching { it.name == "packageRelease" || it.name == "signReleaseBundle" }
+        .configureEach {
+            doFirst {
+                throw GradleException(
+                    "Release signing key not found (keystore/keystore.properties). " +
+                        "Run `bash scripts/make-release-key.sh` first.",
+                )
+            }
+        }
+}

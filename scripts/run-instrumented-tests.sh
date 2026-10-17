@@ -6,6 +6,13 @@
 #   e.g. bash scripts/run-instrumented-tests.sh \
 #          -Pandroid.testInstrumentationRunnerArguments.class=app.newz.SmokeTest
 # Exits with Gradle's exit code (1 if the emulator never finishes booting).
+#
+#        bash scripts/run-instrumented-tests.sh --release-smoke [path/to/app.apk]
+# Instead of the test suite, installs the release APK (default:
+# androidApp/build/outputs/apk/release/androidApp-release.apk), launches
+# app.newz/.MainActivity, waits 10 s, and checks the process is alive with no
+# FATAL EXCEPTION for app.newz in logcat. Exits 0 on a pass. Used by
+# scripts/release-smoke.sh.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -19,6 +26,18 @@ EMULATOR="$ANDROID_HOME/emulator/emulator"
 ADB="$ANDROID_HOME/platform-tools/adb"
 
 log() { printf '[instrumented] %s\n' "$*"; }
+
+release_smoke=0
+release_apk="$REPO_ROOT/androidApp/build/outputs/apk/release/androidApp-release.apk"
+if [ "${1:-}" = "--release-smoke" ]; then
+  release_smoke=1
+  shift
+  if [ -n "${1:-}" ]; then release_apk="$1"; fi
+  if [ ! -f "$release_apk" ]; then
+    log "Release APK not found: $release_apk (run ./gradlew :androidApp:assembleRelease)"
+    exit 1
+  fi
+fi
 
 emu_flags=(-avd "$AVD_NAME" -no-window -no-audio -no-boot-anim -no-snapshot)
 if "$EMULATOR" -help 2>&1 | grep -q -- '-no-metrics'; then
@@ -82,6 +101,41 @@ for setting in window_animation_scale transition_animation_scale animator_durati
 done
 
 export ANDROID_SERIAL="$serial"
+
+run_release_smoke() {
+  local package="app.newz" pid crashes
+  # The release key differs from the debug key: remove any earlier install first,
+  # and again afterwards so the debug test suite can install cleanly next time.
+  "$ADB" uninstall "$package" > /dev/null 2>&1 || true
+  log "Installing ${release_apk#"$REPO_ROOT"/}"
+  "$ADB" install -r "$release_apk"
+  "$ADB" logcat -c
+  log "Launching $package/.MainActivity"
+  "$ADB" shell am start -W -n "$package/.MainActivity"
+  sleep 10
+  pid="$("$ADB" shell pidof "$package" 2> /dev/null | tr -d '\r' || true)"
+  crashes="$("$ADB" logcat -d -b crash,main 2> /dev/null | grep -A 12 'FATAL EXCEPTION' | grep -E "Process: $package([^.]|$)" || true)"
+  "$ADB" uninstall "$package" > /dev/null 2>&1 || true
+  if [ -n "$crashes" ]; then
+    log "RELEASE SMOKE FAIL: FATAL EXCEPTION for $package"
+    printf '%s\n' "$crashes"
+    return 1
+  fi
+  if [ -z "$pid" ]; then
+    log "RELEASE SMOKE FAIL: $package is not running after 10 s"
+    return 1
+  fi
+  log "RELEASE SMOKE PASS: $package alive after 10 s (pid $pid), no FATAL EXCEPTION for $package"
+}
+
+if [ "$release_smoke" -eq 1 ]; then
+  set +e
+  run_release_smoke
+  smoke_status=$?
+  set -e
+  exit "$smoke_status"
+fi
+
 set +e
 (cd "$REPO_ROOT" && ./gradlew :androidApp:connectedDebugAndroidTest "$@")
 gradle_status=$?
