@@ -10,6 +10,31 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 ## Open
 
 
+### B18 — Wordmark animation only flashes now that loads are fast
+- **Severity:** Low (regression from B17's speed-up)
+- **Where:** `FlapWordmark` in `androidApp/src/main/kotlin/app/newz/ui/components/Flap.kt`
+- **Seen:** on refresh the NEWZ tiles flicker for about a quarter of a second.
+- **Cause:** the tiles animate only while `busy` is true and snap back to NEWZ the moment it turns
+  false; a refresh now often finishes in well under a second, mid-cycle.
+- **Requested:** always play at least one full cycle (letters flip until they spell NEWZ, ~2.2 s),
+  and keep cycling for as long as the load lasts; finish the current cycle when it ends.
+
+### B19 — Onboarding shows the app icon beside the wordmark
+- **Severity:** Low
+- **Where:** onboarding header in `androidApp/src/main/kotlin/app/newz/ui/onboarding/OnboardingScreen.kt`
+- **Requested:** remove the app icon; show only the NEWZ flap tiles.
+
+### B20 — Article headlines a little too large
+- **Severity:** Low
+- **Where:** `NewzTokens.typeHeadline` (feed cards: 21 sp, 27 sp line height, bold)
+- **Requested:** a little smaller; amount to be chosen by the owner.
+
+### B21 — Age tiles on the card strip too big next to the outlet name
+- **Severity:** Low
+- **Where:** `CardStrip` / `FlapAge` in `androidApp/src/main/kotlin/app/newz/ui/components/Cards.kt`
+- **Seen:** age tiles are 24×32 dp (24 sp character); the outlet name is 18 sp signage.
+- **Requested:** age tiles about the same size as the outlet name.
+
 ## Fixed
 
 ### B17 — Wordmark flips forever and "Refreshing your feed…" never goes away
