@@ -3,6 +3,11 @@
 A privacy-first news reader for Android. Newz builds your feed straight from publishers' own RSS
 feeds, on your phone. It has no account, no server, no analytics, and it never contacts Google.
 
+> **Scan before you build.** Treat this repo like any code you download from the internet:
+> before you build or run it, ask your coding agent (Claude Code, Codex, Cursor or similar) to
+> review it for security problems, such as hidden network calls, malicious build scripts or
+> suspicious dependencies. It takes a few minutes and is a good habit for every repo you clone.
+
 ## What it does
 
 - **One feed from hundreds of outlets.** A built-in catalog of 343 outlets and 477 feeds across 20
@@ -40,8 +45,15 @@ browser is your default.
 
 ## Install
 
-Newz is not in the Play Store. See **[INSTALL.md](INSTALL.md)** for a step-by-step guide to
-building the APK and sideloading it on your phone (Android 10 or newer).
+Newz is not in the Play Store, so you build the APK yourself and sideload it onto your phone
+(Android 10 or newer).
+
+**[INSTALL.md](INSTALL.md) describes the setup it was written for**: an Apple-silicon Mac and a
+Samsung phone. Your computer, phone and Android version may differ in ways those steps don't
+cover, such as different menu names, USB settings or toolchain paths. The easiest route is to
+ask your coding agent to walk you through it: tell it your computer, your phone model and
+Android version, and have it use INSTALL.md as a starting point while it adapts each step to
+your setup.
 
 ## Build
 
@@ -96,4 +108,12 @@ To report a security or privacy problem, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-LICENSE_TBD
+Copyright (C) 2026 Kyle Mack
+
+Newz is free software: you can redistribute it and/or modify it under the terms of the
+[GNU General Public License version 3](LICENSE) as published by the Free Software Foundation.
+If you share a modified version, you must make its source available under the same license.
+
+Newz is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even
+the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the license
+for details.
