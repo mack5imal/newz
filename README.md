@@ -19,6 +19,11 @@ feeds, on your phone. It has no account, no server, no analytics, and it never c
 
 - **One feed from hundreds of outlets.** A built-in catalog of 343 outlets and 477 feeds across 20
   topics, plus any site you add yourself by address or search.
+- **No paywall dead ends.** The paywall filter, on by default, keeps outlets that lock their
+  articles behind a subscription out of your feed, so every headline you tap is one you can
+  actually read. Outlets with a few free articles a month stay in, marked "Metered". If an outlet
+  starts blocking you, mark it paywalled from any of its cards and it disappears (undo it in
+  Settings › Sources).
 - **Same story, one card.** Articles about the same event from different outlets are grouped
   together on the device, so a big story shows up once rather than ten times.
 - **You decide what you see.** Follow topics and set how often each appears, mute keywords, hide
