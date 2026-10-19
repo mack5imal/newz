@@ -3,10 +3,9 @@
 A privacy-first news reader for Android. Newz builds your feed straight from publishers' own RSS
 feeds, on your phone. It has no account, no server, no analytics, and it never contacts Google.
 
-> **Scan before you build.** Treat this repo like any code you download from the internet:
-> before you build or run it, ask your coding agent (Claude Code, Codex, Cursor or similar) to
-> review it for security problems, such as hidden network calls, malicious build scripts or
-> suspicious dependencies. It takes a few minutes and is a good habit for every repo you clone.
+Newz was built with [Relay](https://github.com/mack5imal/relay), my free plugin for Claude Code
+that plans a project with you and then builds it fully autonomously. Newz was built in a single
+autonomous run, then polished through a couple of hours of hands-on testing and bug fixes.
 
 <p align="center">
   <img src="docs/screenshots/feed.png" width="200" alt="The feed, filtered to Tech and Science">
@@ -68,6 +67,11 @@ Android version, and have it use INSTALL.md as a starting point while it adapts 
 your setup.
 
 ## Build
+
+> **Scan before you build.** Treat this repo like any code you download from the internet:
+> before you build or run it, ask your coding agent (Claude Code, Codex, Cursor or similar) to
+> review it for security problems, such as hidden network calls, malicious build scripts or
+> suspicious dependencies. It takes a few minutes and is a good habit for every repo you clone.
 
 Requirements: a Mac or Linux machine with JDK 17 and the Android SDK (compileSdk 37).
 `scripts/setup-android-toolchain.sh` installs both on macOS without admin rights.
