@@ -8,6 +8,13 @@ feeds, on your phone. It has no account, no server, no analytics, and it never c
 > review it for security problems, such as hidden network calls, malicious build scripts or
 > suspicious dependencies. It takes a few minutes and is a good habit for every repo you clone.
 
+<p align="center">
+  <img src="docs/screenshots/feed.png" width="200" alt="The feed, filtered to Tech and Science">
+  <img src="docs/screenshots/card-menu.png" width="200" alt="A card's menu: save, hide, show more or less, mute">
+  <img src="docs/screenshots/settings.png" width="200" alt="Settings">
+  <img src="docs/screenshots/feed-dark.png" width="200" alt="The feed in dark mode">
+</p>
+
 ## What it does
 
 - **One feed from hundreds of outlets.** A built-in catalog of 343 outlets and 477 feeds across 20
