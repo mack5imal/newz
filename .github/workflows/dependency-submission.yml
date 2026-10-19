@@ -1,6 +1,7 @@
-# Sends Newz's resolved Gradle dependencies to GitHub's dependency graph, so Dependabot alerts
-# cover every library (GitHub cannot read Gradle version catalogs on its own). Resolves
-# dependencies only; nothing is built, tested or published.
+# Sends the libraries that ship in the Newz APK to GitHub's dependency graph, so Dependabot
+# alerts cover them (GitHub cannot read Gradle version catalogs on its own). Only the release
+# runtime classpath is reported: build and test tools (lint, ktlint, the emulator test runner)
+# never reach a phone. Resolves dependencies only; nothing is built, tested or published.
 name: Dependency submission
 
 on:
@@ -21,3 +22,5 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/dependency-submission@v6
+        with:
+          dependency-graph-include-configurations: releaseRuntimeClasspath
