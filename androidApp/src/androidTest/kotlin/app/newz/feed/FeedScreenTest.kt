@@ -13,6 +13,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
@@ -153,6 +154,56 @@ class FeedScreenTest {
         compose.waitUntil(TIMEOUT_MS) {
             compose.onAllNodesWithTag(FeedSemantics.REFRESH_PANEL_TAG).fetchSemanticsNodes().isEmpty()
         }
+    }
+
+    /**
+     * B22: a background load over cached cards leaves them in place and offers "N new stories";
+     * the button re-ranks the feed, newest first, and scrolls back to the top.
+     */
+    @Test
+    fun newStoriesFromABackgroundLoadWaitBehindTheNewStoriesButton() {
+        val now = Clock.System.now()
+        server.fill(itemsPerFeed = 3, now = now, newestAge = 1.days)
+        val catalog = TestCatalog.build(server)
+        TestApp.install(catalog)
+        val prefs = TestPrefs.onboarded()
+        launch()
+        compose.waitForStableFeed(minCards = 20)
+        assertTrue(compose.onAllNodesWithTag(FeedSemantics.NEW_STORIES_TAG).fetchSemanticsNodes().isEmpty())
+        scenario?.close()
+
+        // Relaunch on the cache while each feed has one fresh story, answered slowly enough that
+        // the cached cards show first.
+        val fresh = mutableSetOf<String>()
+        server.feeds.forEachIndexed { f, config ->
+            val item = server.item(f, 50, now - 5.minutes)
+            fresh += item.link
+            config.items = listOf(item) + config.items
+            config.delayMs = 1_500
+        }
+        TestApp.install(catalog, keepDatabase = true)
+        TestPrefs.write(prefs)
+        launch()
+        compose.waitForCards()
+        val cached = compose.servedCards().map { it.id }
+        assertEquals(20, cached.size)
+        compose.waitForText("8 new stories", TIMEOUT_MS)
+        val merged = compose.servedCards()
+        assertEquals("cached cards stay in place", cached, merged.take(cached.size).map { it.id })
+        assertTrue(merged.none { it.url in fresh })
+        compose.onNode(hasContentDescription("Show 8 new stories")).assertIsDisplayed()
+
+        // Still shown when scrolled down; a tap brings the newest stories to the top.
+        compose.onNodeWithTag(FeedSemantics.LIST_TAG).performScrollToIndex(10)
+        compose.waitForIdle()
+        compose.onNodeWithTag(FeedSemantics.NEW_STORIES_TAG).assertIsDisplayed().performClick()
+        compose.waitUntil(TIMEOUT_MS) {
+            compose.onAllNodesWithTag(FeedSemantics.NEW_STORIES_TAG).fetchSemanticsNodes().isEmpty() &&
+                compose.visibleCards().firstOrNull()?.url in fresh
+        }
+        val top = compose.servedCards().take(8).map { it.url }
+        assertEquals(fresh, top.toSet())
+        compose.onNode(hasText("World") and hasClickAction()).assertIsDisplayed()
     }
 
     @Test

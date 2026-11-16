@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
@@ -91,6 +92,17 @@ internal fun refreshBandShown(
     board: FlapBoardState,
 ): Boolean = refreshing || board.played
 
+/** The New stories button's count shows up to this; more reads "99+". */
+private const val NEW_STORIES_CAP = 99
+
+/** The New stories button's label: "1 new story", "{n} new stories", "99+ new stories". */
+internal fun newStoriesLabel(count: Int): String =
+    when {
+        count == 1 -> "1 new story"
+        count > NEW_STORIES_CAP -> "$NEW_STORIES_CAP+ new stories"
+        else -> "$count new stories"
+    }
+
 /** `loadMore()` fires when the last visible card is within this many items of the end. */
 private const val LOAD_MORE_THRESHOLD = 5
 
@@ -109,6 +121,7 @@ object FeedSemantics {
     const val CARD_TAG = "articleCard"
     const val STORY_ROW_TAG = "storyRow"
     const val REFRESH_PANEL_TAG = "refreshPanel"
+    const val NEW_STORIES_TAG = "newStories"
 
     val Card = SemanticsPropertyKey<FeedCardInfo>("FeedCard")
     val Cards = SemanticsPropertyKey<List<FeedCardInfo>>("FeedCards")
@@ -133,7 +146,9 @@ private fun FeedCard.info(): FeedCardInfo {
  * below it until the app-bar wordmark tiles, which flip while the feed loads or refreshes, settle on
  * NEWZ ([refreshBandShown]). ⋮ and a long-press open [CardMenuSheet],
  * whose Mute a keyword… opens [KeywordMuteSheet]. A card removed by an action collapses out
- * (`card-collapse`). The Undo `Snackbar` host lives here.
+ * (`card-collapse`). The Undo `Snackbar` host lives here. When a load over shown cards brought
+ * stories ([FeedState.Content.newStories]), a New stories button floats at the top of the list;
+ * it and a pull to refresh re-rank the feed and scroll back to the top (B22).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -158,6 +173,7 @@ fun FeedScreen(
     val chips = prefs?.let(viewModel::chips).orEmpty()
 
     LoadMoreEffect(listState, served, viewModel::loadMore)
+    LaunchedEffect(listState) { viewModel.scrollToTop.collect { listState.animateScrollToItem(0) } }
 
     Box(Modifier.fillMaxSize().background(c.paper)) {
         Column(Modifier.fillMaxSize()) {
@@ -227,6 +243,14 @@ fun FeedScreen(
                         onShare = { viewModel.share(context, it) },
                         onMore = { menuCardId = it.group.lead.id },
                         onGroup = { openGroup = it },
+                    )
+                }
+                val newStories = (state as? FeedState.Content)?.newStories ?: 0
+                if (newStories > 0) {
+                    NewStoriesButton(
+                        count = newStories,
+                        onClick = viewModel::showNewStories,
+                        modifier = Modifier.align(Alignment.TopCenter).padding(top = NewzTokens.spaceS),
                     )
                 }
             }
@@ -424,6 +448,29 @@ private fun FeedArticleCard(
                 .padding(start = NewzTokens.spaceM, end = NewzTokens.spaceM, bottom = NewzTokens.spaceCardGap)
                 .testTag(FeedSemantics.CARD_TAG)
                 .semantics { feedCard = info },
+    )
+}
+
+/**
+ * New stories: a Primary [Button] with `icon-arrow-up`, floating over the top of the list so it
+ * shows however far the feed is scrolled. The count covers the whole feed, not only the topics a
+ * filter shows.
+ */
+@Composable
+private fun NewStoriesButton(
+    count: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val label = newStoriesLabel(count)
+    Button(
+        text = label,
+        onClick = onClick,
+        icon = NewzIcons.iconArrowUp,
+        modifier =
+            modifier
+                .testTag(FeedSemantics.NEW_STORIES_TAG)
+                .semantics { contentDescription = "Show $label" },
     )
 }
 

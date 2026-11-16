@@ -29,7 +29,9 @@ import app.newz.store.unmuteKeyword
 import app.newz.ui.components.TagKind
 import app.newz.ui.components.tagKind
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -111,6 +113,11 @@ class FeedViewModel(
             refreshing || loading || state is FeedState.Loading
         }.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
+    private val scrollToTopEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** Fires once the feed was re-ranked from the top (a pull to refresh, New stories): scroll up. */
+    val scrollToTop: SharedFlow<Unit> = scrollToTopEvents
+
     private val messageState = MutableStateFlow<FeedMessage?>(null)
     val message: StateFlow<FeedMessage?> = messageState.asStateFlow()
 
@@ -140,16 +147,31 @@ class FeedViewModel(
         graph.topicSelection = topics
     }
 
-    /** Pull to refresh and Retry: reloads every followed feed, joining a load already running. */
+    /**
+     * Pull to refresh and Retry: reloads every followed feed, joining a load already running, and
+     * re-ranks the feed from the top when it lands (B22).
+     */
     fun refresh() {
         if (refreshingState.value) return
         refreshingState.value = true
         viewModelScope.launch {
             try {
-                repository.refresh().join()
+                repository.refresh(rerank = true).join()
+                scrollToTopEvents.tryEmit(Unit)
             } finally {
                 refreshingState.value = false
             }
+        }
+    }
+
+    /**
+     * The New stories button: re-ranks the feed from the cache so the stories a background load
+     * merged behind the served cards come first ([FeedState.Content.newStories]).
+     */
+    fun showNewStories() {
+        viewModelScope.launch {
+            repository.showNewStories().join()
+            scrollToTopEvents.tryEmit(Unit)
         }
     }
 
