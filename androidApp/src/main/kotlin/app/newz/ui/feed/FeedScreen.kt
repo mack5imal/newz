@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -32,7 +33,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
@@ -171,6 +174,8 @@ fun FeedScreen(
     var muteHeadline by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val chips = prefs?.let(viewModel::chips).orEmpty()
+    // The New stories button floats just below the chip row, so it never covers the chips.
+    var chipRowHeight by remember { mutableIntStateOf(0) }
 
     LoadMoreEffect(listState, served, viewModel::loadMore)
     LaunchedEffect(listState) { viewModel.scrollToTop.collect { listState.animateScrollToItem(0) } }
@@ -223,7 +228,7 @@ fun FeedScreen(
                             .semantics { feedCards = cards.map { it.info() } },
                 ) {
                     item(key = "chips") {
-                        TopicChipRow {
+                        TopicChipRow(Modifier.onSizeChanged { chipRowHeight = it.height }) {
                             chips.forEach { chip ->
                                 TopicChip(
                                     text = chip.label,
@@ -250,7 +255,10 @@ fun FeedScreen(
                     NewStoriesButton(
                         count = newStories,
                         onClick = viewModel::showNewStories,
-                        modifier = Modifier.align(Alignment.TopCenter).padding(top = NewzTokens.spaceS),
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = with(LocalDensity.current) { chipRowHeight.toDp() } + NewzTokens.spaceS),
                     )
                 }
             }
