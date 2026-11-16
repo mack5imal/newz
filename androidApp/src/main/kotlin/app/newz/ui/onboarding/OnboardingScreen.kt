@@ -16,9 +16,11 @@ import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -32,6 +34,8 @@ import app.newz.ui.components.NoteRow
 import app.newz.ui.components.PlainText
 import app.newz.ui.components.SplitRule
 import app.newz.ui.components.TopicChip
+import app.newz.ui.components.hiddenBehindSheet
+import app.newz.ui.local.LocalArea
 import app.newz.ui.local.LocalAreaNote
 import app.newz.ui.local.ZipCodeSheet
 import app.newz.ui.nav.Screen
@@ -60,8 +64,17 @@ fun OnboardingScreen(
     onFinished: () -> Unit,
 ) {
     val c = LocalNewzPalette.current
+    // The picks are saved here too, so they survive process death (B50). They are handed back
+    // before the view model's state is first read, so the save below never sees an empty set.
+    var savedPicks by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var savedLocal by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    remember { viewModel.restore(savedPicks.toSet(), localAreaFrom(savedLocal)) }
     val picked by viewModel.picked.collectAsState()
     val local by viewModel.local.collectAsState()
+    SideEffect {
+        savedPicks = picked.toList()
+        savedLocal = local?.let { listOf(it.zip, it.metroId, it.metroName, it.nearest.toString()) }.orEmpty()
+    }
     var zipSheetOpen by rememberSaveable { mutableStateOf(false) }
     val count = picked.size
     val ready = count >= MIN_TOPICS
@@ -72,7 +85,7 @@ fun OnboardingScreen(
             .background(c.paper)
             .testTag(Screen.tagOf(Screen.Onboarding)),
     ) {
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().hiddenBehindSheet(zipSheetOpen)) {
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                 OnboardingHeader()
                 SplitRule()
@@ -172,3 +185,7 @@ private fun OnboardingHeader() {
         if (c.isDark) Box(Modifier.fillMaxWidth().height(NewzTokens.rule).background(c.sky))
     }
 }
+
+/** The [LocalArea] saved as its four fields, or null when none was. */
+private fun localAreaFrom(fields: List<String>): LocalArea? =
+    if (fields.size == 4) LocalArea(fields[0], fields[1], fields[2], fields[3].toBoolean()) else null

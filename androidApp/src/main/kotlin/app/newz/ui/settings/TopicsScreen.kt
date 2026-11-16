@@ -76,7 +76,7 @@ fun TopicsScreen(
     var showAll by rememberSaveable { mutableStateOf(false) }
     var editZip by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.reload() }
-    SettingsFrame(Screen.Topics, "Topics & keywords", viewModel, onBack) {
+    SettingsFrame(Screen.Topics, "Topics & keywords", viewModel, onBack, sheetOpen = editZip) {
         val p = prefs ?: return@SettingsFrame
         val followed = viewModel.followedTopics(p)
         Panel(title = "Followed topics", count = "${followed.size}") {

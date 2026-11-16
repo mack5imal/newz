@@ -11,6 +11,7 @@ import app.newz.discover.FeedDiscovery
 import app.newz.engine.FeedRepository
 import app.newz.engine.PageImages
 import app.newz.engine.androidConnectivity
+import app.newz.engine.androidConnectivityChanges
 import app.newz.net.PageImageFinder
 import app.newz.net.newzHttpClient
 import app.newz.platform.ArticleOpener
@@ -31,6 +32,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -171,6 +173,9 @@ class AppGraph private constructor(
      * never written to preferences; the feed's ViewModel reads and updates it.
      */
     var topicSelection: Set<String> = emptySet()
+
+    /** Emits whenever the default network changes (B56); collect it only while a screen shows. */
+    val connectivityChanges: Flow<Unit> by lazy { androidConnectivityChanges(appContext) }
 
     /**
      * Restores [contents] in the app's own scope rather than a screen's (B33), so leaving Backup

@@ -1,12 +1,17 @@
 package app.newz.ui.local
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -142,52 +147,60 @@ fun ZipCodeSheet(
         }
     }
 
-    BottomSheet(onDismiss = onDismiss, label = "Your zip code") {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .imePadding()
-                .padding(
-                    start = NewzTokens.spaceXl,
-                    end = NewzTokens.spaceXl,
-                    bottom = NewzTokens.spaceXl + NewzTokens.spaceXs,
-                ),
-        ) {
-            SignageText(text = "Your zip code", style = NewzTokens.typeSheetTitle, color = c.ink)
-            PlainText(
-                text = INTRO,
-                style = NewzTokens.typeIntro,
-                color = c.inkMuted,
-                modifier = Modifier.padding(top = NewzTokens.spaceXs),
-            )
-            TextField(
-                value = text,
-                onValueChange = {
-                    text = it
-                    error = null
-                },
-                label = "Zip code",
-                error = shownError?.let(::messageOf),
-                maxLength = ZIP_LENGTH,
-                counter = "",
-                fieldModifier = Modifier.focusRequester(focus),
-                keyboardOptions =
-                    KeyboardOptions(
-                        autoCorrectEnabled = false,
-                        keyboardType = KeyboardType.Number,
-                        imeAction = ImeAction.Done,
+    // In landscape or at large text the keyboard leaves little room (B51): the body scrolls
+    // and the buttons stay in view above the keyboard.
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val maxSheetHeight = maxHeight - NewzTokens.storySheetTopGap
+        BottomSheet(onDismiss = onDismiss, label = "Your zip code") {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = maxSheetHeight)
+                    .imePadding()
+                    .padding(
+                        start = NewzTokens.spaceXl,
+                        end = NewzTokens.spaceXl,
+                        bottom = NewzTokens.spaceXl + NewzTokens.spaceXs,
                     ),
-                modifier = Modifier.padding(top = NewzTokens.spaceL + NewzTokens.spaceXs),
-            )
-            if (found != null && shownError == null) {
-                LocalAreaNote(found, Modifier.padding(top = NewzTokens.spaceXs))
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = NewzTokens.spaceL),
-                horizontalArrangement = Arrangement.spacedBy(NewzTokens.spaceS, Alignment.End),
             ) {
-                Button(text = "Cancel", onClick = onDismiss, variant = ButtonVariant.Text)
-                Button(text = "Save", onClick = ::save, variant = ButtonVariant.Primary)
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                    SignageText(text = "Your zip code", style = NewzTokens.typeSheetTitle, color = c.ink)
+                    PlainText(
+                        text = INTRO,
+                        style = NewzTokens.typeIntro,
+                        color = c.inkMuted,
+                        modifier = Modifier.padding(top = NewzTokens.spaceXs),
+                    )
+                    TextField(
+                        value = text,
+                        onValueChange = {
+                            text = it
+                            error = null
+                        },
+                        label = "Zip code",
+                        error = shownError?.let(::messageOf),
+                        maxLength = ZIP_LENGTH,
+                        counter = "",
+                        fieldModifier = Modifier.focusRequester(focus),
+                        keyboardOptions =
+                            KeyboardOptions(
+                                autoCorrectEnabled = false,
+                                keyboardType = KeyboardType.Number,
+                                imeAction = ImeAction.Done,
+                            ),
+                        modifier = Modifier.padding(top = NewzTokens.spaceL + NewzTokens.spaceXs),
+                    )
+                    if (found != null && shownError == null) {
+                        LocalAreaNote(found, Modifier.padding(top = NewzTokens.spaceXs))
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = NewzTokens.spaceL),
+                    horizontalArrangement = Arrangement.spacedBy(NewzTokens.spaceS, Alignment.End),
+                ) {
+                    Button(text = "Cancel", onClick = onDismiss, variant = ButtonVariant.Text)
+                    Button(text = "Save", onClick = ::save, variant = ButtonVariant.Primary)
+                }
             }
         }
     }

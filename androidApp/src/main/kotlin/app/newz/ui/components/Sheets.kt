@@ -42,8 +42,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.dismiss
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +54,14 @@ import app.newz.ui.theme.NewzTokens
 import app.newz.ui.theme.SignageText
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+
+/**
+ * Hides a screen's content from accessibility services while one of its sheets is open (B52).
+ * A [BottomSheet] is drawn in the screen's own tree, not a window of its own, so without this
+ * TalkBack moves past the sheet's last action onto the cards and buttons behind the scrim.
+ * Apply it to the content, never to a parent of the sheet.
+ */
+fun Modifier.hiddenBehindSheet(sheetOpen: Boolean): Modifier = if (sheetOpen) clearAndSetSemantics {} else this
 
 /** Dragging the sheet down by more than this share of its height dismisses it. */
 private const val SHEET_DISMISS_FRACTION = 0.25f
@@ -107,6 +117,7 @@ fun BottomSheet(
                         .background(c.card)
                         .semantics {
                             paneTitle = label
+                            isTraversalGroup = true
                             dismiss {
                                 dismiss()
                                 true

@@ -85,6 +85,17 @@ class KeywordMuteTest {
     private fun muteButton() = compose.onNodeWithText("Mute")
 
     @Test
+    fun anOpenKeywordSheetAndItsTextSurviveRecreation() {
+        // B54: rotation, a theme change or a text-size change used to close the sheet.
+        start()
+        openKeywordSheet(HEADLINE)
+        field().performTextInput("glacier")
+        scenario!!.recreate()
+        compose.waitForText("From this headline")
+        field().assert(hasText("glacier"))
+    }
+
+    @Test
     fun muteFromASuggestionRemovesEveryMatchingCardOnceAndSurvivesRecreation() {
         start()
         assertEquals(3, compose.servedCards().count(::mentions))

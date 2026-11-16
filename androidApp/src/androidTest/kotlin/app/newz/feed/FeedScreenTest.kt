@@ -86,6 +86,30 @@ class FeedScreenTest {
     }
 
     @Test
+    fun theFeedKeepsItsScrollPositionAcrossSavedAndBack() {
+        // B47: leaving the feed used to throw away its scroll position.
+        server.fill(itemsPerFeed = 4)
+        TestApp.install(TestCatalog.build(server))
+        TestPrefs.onboarded()
+        launch()
+        compose.waitForStableFeed(minCards = 20)
+        compose.onNodeWithTag(FeedSemantics.LIST_TAG).performScrollToIndex(12)
+        compose.waitForIdle()
+        val before = compose.visibleCards().first().id
+
+        compose.onNode(hasText("Saved") and hasClickAction()).performClick()
+        compose.waitUntil(TIMEOUT_MS) {
+            compose.onAllNodes(hasTestTag(Screen.tagOf(Screen.Saved))).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNode(hasContentDescription("Back") and hasClickAction()).performClick()
+        compose.waitUntil(TIMEOUT_MS) {
+            compose.onAllNodes(hasTestTag(FeedSemantics.LIST_TAG)).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.waitForIdle()
+        assertEquals(before, compose.visibleCards().first().id)
+    }
+
+    @Test
     fun cardShowsHeadlineOutletAgeAndImageOrPlaceholder() {
         server.fill(itemsPerFeed = 2, imageEvery = 2)
         val byUrl = server.feeds.flatMap { it.items }.associateBy { it.link }
