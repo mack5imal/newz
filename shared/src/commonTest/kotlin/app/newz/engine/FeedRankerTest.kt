@@ -12,6 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
@@ -171,5 +172,62 @@ class FeedRankerTest {
         val fresh = group("fresh", "world", "outlet-y", 0.minutes)
         val ranked = FeedRanker.rank(listOf(fresh, future), UserPrefs(followedTopics = topics), now)
         assertEquals(listOf("fresh", "future"), ranked.map { it.lead.id })
+    }
+
+    /** Cards over 7 days and 3 levels, each outlet holding at most 2 cards, so spread never bends the order. */
+    @Test
+    fun newerBandAlwaysComesFirst() {
+        val random = Random(22)
+        val levels = mapOf("tech" to Level.MORE, "sports" to Level.MUCH_MORE)
+        val prefs = UserPrefs(followedTopics = topics, topicLevels = levels)
+        val fixture =
+            (0 until 120).map { i ->
+                val age = random.nextLong(7.days.inWholeMinutes).minutes
+                group("n$i", topics[random.nextInt(topics.size)], "outlet-${i / 2}", age)
+            }
+        val bands =
+            FeedRanker.rank(fixture, prefs, now).map {
+                FeedRanker.band(now - it.lead.date, levels[it.lead.primaryTopic] ?: Level.NORMAL)
+            }
+        assertTrue(bands.toSet().size >= 4, "bands ${bands.toSet()}")
+        assertEquals(bands.sorted(), bands)
+    }
+
+    /** B22: a quiet topic's day-old story no longer takes its turn among minutes-old ones. */
+    @Test
+    fun aQuietTopicsDayOldStoryRanksBelowFreshStories() {
+        val fresh =
+            listOf("world", "tech", "sports").flatMapIndexed { t, topic ->
+                (0 until 6).map { i -> group("$topic-$i", topic, "outlet-$t$i", (i * 10).minutes) }
+            }
+        val dayOld = group("quiet", "science", "outlet-q", 1.days)
+        val ranked = FeedRanker.rank(fresh + dayOld, UserPrefs(followedTopics = topics), now)
+        assertEquals("quiet", ranked.last().lead.id)
+    }
+
+    @Test
+    fun muchMoreTopicStretchesTheNewestBand() {
+        val normal =
+            (0 until 10).map { group("fresh$it", "world", "outlet-f$it", (it * 10).minutes) } +
+                (0 until 10).map { group("older$it", "tech", "outlet-o$it", 3.hours + (it * 10).minutes) }
+        val boosted = group("boosted", "science", "outlet-b", 5.hours)
+        val prefs = UserPrefs(followedTopics = topics, topicLevels = mapOf("science" to Level.MUCH_MORE))
+        val ids = FeedRanker.rank(normal + boosted, prefs, now).map { it.lead.id }
+        assertTrue(ids.indexOf("boosted") < ids.indexOfFirst { it.startsWith("older") }, "order $ids")
+    }
+
+    /** A saturated outlet's band falls back to its later card, then the next band, and only then relaxes. */
+    @Test
+    fun spreadPullsFromTheNextBandBeforeRelaxing() {
+        val newest =
+            (0 until 3).map { group("a$it", "world", "outlet-a", (it * 5).minutes) } +
+                group("z", "world", "outlet-z", 30.minutes)
+        val next = (0 until 8).map { group("b$it", "tech", "outlet-b$it", 3.hours + it.minutes) }
+        val ranked = FeedRanker.rank(newest + next, UserPrefs(followedTopics = topics), now)
+        assertEquals(
+            listOf("a0", "a1", "z", "b0", "b1", "b2", "b3", "b4", "b5", "b6", "a2", "b7"),
+            ranked.map { it.lead.id },
+        )
+        assertTrue(worstWindowCount(ranked) <= 2)
     }
 }
