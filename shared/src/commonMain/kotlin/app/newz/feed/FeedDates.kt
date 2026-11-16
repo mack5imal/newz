@@ -10,20 +10,48 @@ internal object FeedDates {
     private val MONTHS =
         listOf("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
 
+    /**
+     * Zone abbreviations, as minutes east of UTC. Beyond RFC 822's US zones these are the
+     * unambiguous ones the catalog's outlets use (B37); an abbreviation not listed here gives no
+     * date at all rather than a guess, so the item falls back to when it was first seen. IST
+     * (Irish, Israeli or Indian) is left out on purpose.
+     */
     private val ZONES =
         mapOf(
             "ut" to 0,
             "utc" to 0,
             "gmt" to 0,
             "z" to 0,
-            "est" to -5,
-            "edt" to -4,
-            "cst" to -6,
-            "cdt" to -5,
-            "mst" to -7,
-            "mdt" to -6,
-            "pst" to -8,
-            "pdt" to -7,
+            "est" to -300,
+            "edt" to -240,
+            "cst" to -360,
+            "cdt" to -300,
+            "mst" to -420,
+            "mdt" to -360,
+            "pst" to -480,
+            "pdt" to -420,
+            "akst" to -540,
+            "akdt" to -480,
+            "hst" to -600,
+            "wet" to 0,
+            "west" to 60,
+            "bst" to 60,
+            "cet" to 60,
+            "cest" to 120,
+            "eet" to 120,
+            "eest" to 180,
+            "msk" to 180,
+            "hkt" to 480,
+            "sgt" to 480,
+            "awst" to 480,
+            "jst" to 540,
+            "kst" to 540,
+            "acst" to 570,
+            "acdt" to 630,
+            "aest" to 600,
+            "aedt" to 660,
+            "nzst" to 720,
+            "nzdt" to 780,
         )
 
     private val RFC822 =
@@ -32,8 +60,20 @@ internal object FeedDates {
                 "(\\d{1,2}):(\\d{2})(?::(\\d{2}))?\\s*([+-]\\d{4}|[+-]\\d{2}:\\d{2}|[A-Za-z]{1,5})?\\s*$",
         )
 
+    /** A trailing comment, as in `+0000 (UTC)`, which RFC 822 allows and some feeds add. */
+    private val COMMENT = Regex("\\s*\\([^()]*\\)\\s*$")
+
+    /**
+     * ISO 8601 date-times in the spellings feeds use (B36): `T` or a space between date and time,
+     * seconds and a fraction optional, and an offset of `Z`, `+hh`, `+hhmm` or `+hh:mm`, with or
+     * without a space before it. No offset reads as UTC.
+     */
+    private val ISO =
+        Regex(
+            "^(\\d{4}-\\d{2}-\\d{2})[Tt ](\\d{2}:\\d{2})(:\\d{2}(?:\\.\\d{1,9})?)?" +
+                "\\s?([Zz]|[+-]\\d{2}(?::?\\d{2})?)?$",
+        )
     private val ISO_DATE_ONLY = Regex("^(\\d{4})-(\\d{2})-(\\d{2})$")
-    private val ISO_NO_ZONE = Regex("^\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?$")
 
     fun parse(raw: String?): Instant? {
         val s = raw?.trim().orEmpty()
@@ -42,9 +82,16 @@ internal object FeedDates {
     }
 
     private fun parseIso(s: String): Instant? {
-        runCatching { return Instant.parse(s.replace(' ', 'T')) }
-        if (ISO_NO_ZONE.matches(s)) {
-            runCatching { return LocalDateTime.parse(s.replace(' ', 'T')).toInstant(UtcOffset.ZERO) }
+        ISO.matchEntire(s)?.let { m ->
+            val (date, hm, seconds, zone) = m.destructured
+            val offset =
+                when {
+                    zone.isEmpty() || zone.equals("z", ignoreCase = true) -> "Z"
+                    zone.length == 3 -> "$zone:00"
+                    ':' in zone -> zone
+                    else -> zone.substring(0, 3) + ":" + zone.substring(3)
+                }
+            return runCatching { Instant.parse("${date}T$hm${seconds.ifEmpty { ":00" }}$offset") }.getOrNull()
         }
         ISO_DATE_ONLY.matchEntire(s)?.let { m ->
             val (y, mo, d) = m.destructured
@@ -52,11 +99,11 @@ internal object FeedDates {
                 LocalDateTime(y.toInt(), mo.toInt(), d.toInt(), 0, 0).toInstant(UtcOffset.ZERO)
             }.getOrNull()
         }
-        return null
+        return runCatching { Instant.parse(s) }.getOrNull()
     }
 
     private fun parseRfc822(s: String): Instant? {
-        val m = RFC822.matchEntire(s) ?: return null
+        val m = RFC822.matchEntire(COMMENT.replace(s, "")) ?: return null
         val g = m.groupValues
         val month = MONTHS.indexOf(g[2].take(3).lowercase()) + 1
         if (month == 0) return null
@@ -78,6 +125,6 @@ internal object FeedDates {
             val minutes = digits.substring(2, 4).toInt()
             return sign * (hours * 3600 + minutes * 60)
         }
-        return ZONES[zone.lowercase()]?.let { it * 3600 } ?: 0
+        return ZONES[zone.lowercase()]?.let { it * 60 }
     }
 }

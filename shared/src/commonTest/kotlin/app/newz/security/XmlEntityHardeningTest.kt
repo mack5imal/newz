@@ -5,6 +5,7 @@ import app.newz.feed.FeedParser
 import app.newz.feed.ParsedFeed
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -77,5 +78,34 @@ class XmlEntityHardeningTest {
                     "<rss version=\"2.0\"><channel><title>P</title><link>https://p.example/</link>" +
                     "<item><title>T</title><link>https://p.example/a</link></item></channel></rss>"
             assertFailsWith<FeedParseException> { parse(xml) }
+        }
+
+    private fun feedWith(description: String) =
+        "<rss version=\"2.0\"><channel><title>Sec</title><link>https://s.example/</link>" +
+            "<item><title>On XXE</title><link>https://s.example/a</link>" +
+            "<description>$description</description></item></channel></rss>"
+
+    @Test
+    fun aDeclarationQuotedInsideCdataIsJustText() =
+        runTest {
+            // B44: a security blog quoting an XXE payload must not make its whole feed fail.
+            val payload = "<![CDATA[<p>Try <code><!ENTITY xxe SYSTEM \"file:///etc/passwd\"></code></p>]]>"
+            val feed = parse(feedWith(payload))
+            assertEquals(listOf("On XXE"), feed.items.map { it.title })
+            assertFalse(feed.allText().contains("root:"))
+        }
+
+    @Test
+    fun aDeclarationOutsideCdataOrCommentsIsStillRefused() =
+        runTest {
+            // A comment that only looks like it opens a CDATA section hides nothing: the quoted
+            // "]>" leaves a declaration behind once the DOCTYPE pattern has run, as above.
+            val afterComment =
+                "<!-- <![CDATA[ --><!DOCTYPE rss [<!ENTITY a \"]>\"><!ENTITY x SYSTEM \"file:///etc/passwd\">]>"
+            assertFailsWith<FeedParseException> { parse(afterComment + feedWith("x")) }
+            // An unterminated CDATA section is refused rather than trusted.
+            assertFailsWith<FeedParseException> { parse(feedWith("<![CDATA[ <!ENTITY x \"y\">")) }
+            // A declaration in plain element text is refused, as before.
+            assertFailsWith<FeedParseException> { parse(feedWith("<!ENTITY x \"y\">")) }
         }
 }

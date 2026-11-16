@@ -81,7 +81,24 @@ class KeywordMatcher(
             keyword: String,
         ): Boolean =
             token.startsWith(keyword) &&
-                ENDINGS.any { token.length == keyword.length + it.length && token.endsWith(it) }
+                ENDINGS.any { ending ->
+                    token.length == keyword.length + ending.length &&
+                        token.endsWith(ending) &&
+                        (ending != "es" || takesEs(keyword))
+                }
+
+        /**
+         * The word endings English adds "es" after (B43). Elsewhere "es" is part of another word:
+         * muting "Tim" must not hide "times", nor "rat" hide "rates".
+         */
+        private val ES_STEMS = listOf("s", "x", "z", "ch", "sh", "o")
+
+        /**
+         * True when "es" may follow [keyword]. A two-letter word ending in s, such as "US", is left
+         * out: "uses" is far likelier than a plural of it, while "bus" and "gas" keep theirs.
+         */
+        private fun takesEs(keyword: String): Boolean =
+            ES_STEMS.any { keyword.endsWith(it) } && !(keyword.length < 3 && keyword.endsWith("s"))
 
         private val APOSTROPHES = setOf('’', '‘', 'ʼ')
 

@@ -1,9 +1,11 @@
 package app.newz.engine
 
+import app.newz.net.newzHttpClient
 import app.newz.store.ArticleIds
 import app.newz.store.StoredArticle
 import app.newz.store.muteKeyword
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -197,5 +199,95 @@ class RefreshCoordinatorTest {
             gate.complete(Unit)
             running.join()
             assertEquals(listOf(1, 1, 1), listOf("a", "b", "c").map(h::requestsTo))
+        }
+
+    @Test
+    fun aFeedFollowedDuringALoadIsFetchedBeforeItEnds() =
+        runTest {
+            // B38: following an outlet while the start-up load runs used to join a load that
+            // never fetched it.
+            val h = EngineHarness(feedIds = listOf("a", "b", "c", "d"))
+            listOf("a", "b", "c", "d").forEachIndexed { i, f ->
+                h.items[f] = listOf(TestItem("$f-1", EngineHarness.uniqueTitle(i)))
+            }
+            h.prefs.value = h.prefs.value.copy(followedOutlets = h.prefs.value.followedOutlets - "d")
+            val repo = h.repository(backgroundScope)
+            val gate = h.startHeldLoad(repo)
+
+            h.prefs.value =
+                h.prefs.value.copy(followedOutlets = h.prefs.value.followedOutlets + ("d" to setOf("d-world")))
+            val joined = repo.refresh()
+            gate.complete(Unit)
+            joined.join()
+
+            assertEquals(listOf(1, 1, 1, 1), listOf("a", "b", "c", "d").map(h::requestsTo))
+            assertEquals(4, assertIs<FeedState.Content>(repo.feed.first()).cards.size)
+        }
+
+    @Test
+    fun aFullRefreshJoiningARetryFetchesEveryFeed() =
+        runTest {
+            val h = EngineHarness()
+            listOf("a", "b", "c").forEachIndexed { i, f ->
+                h.items[f] = listOf(TestItem("$f-1", EngineHarness.uniqueTitle(i)))
+            }
+            val repo = h.repository(backgroundScope)
+            repo.refresh().join()
+            assertEquals(listOf(1, 1, 1), listOf("a", "b", "c").map(h::requestsTo))
+
+            val gate = CompletableDeferred<Unit>()
+            h.gate = gate
+            val retry = repo.retryFeed("b-world")
+            val full = repo.refresh()
+            gate.complete(Unit)
+            retry.join()
+            full.join()
+            assertEquals(listOf(2, 2, 2), listOf("a", "b", "c").map(h::requestsTo))
+        }
+
+    @Test
+    fun aRefreshAfterTheFetchPhaseEndedStartsAnotherLoad() =
+        runTest {
+            // B45: a pull while the finishing load composes used to join it and fetch nothing.
+            val h = EngineHarness()
+            listOf("a", "b", "c").forEachIndexed { i, f ->
+                h.items[f] = listOf(TestItem("$f-1", EngineHarness.uniqueTitle(i)))
+            }
+            val inOnLoaded = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            var loads = 0
+            val coordinator =
+                RefreshCoordinator(
+                    scope = backgroundScope,
+                    fetcher =
+                        FeedFetcher(
+                            newzHttpClient(h.engine),
+                            h.store,
+                            { true },
+                            Dispatchers.IO.limitedParallelism(1),
+                            { h.now },
+                        ),
+                    store = h.store,
+                    prefs = h.prefs,
+                    catalog = h.catalog,
+                    storeDispatcher = Dispatchers.IO.limitedParallelism(1),
+                    clock = { h.now },
+                    onLoaded = {
+                        loads++
+                        if (loads == 1) {
+                            inOnLoaded.complete(Unit)
+                            release.await()
+                        }
+                    },
+                )
+            val first = coordinator.refresh()
+            inOnLoaded.await()
+            val second = coordinator.refresh()
+            assertFalse(second === first, "a request after the fetch phase is not folded into it")
+            release.complete(Unit)
+            first.await()
+            second.await()
+            assertEquals(2, loads)
+            assertEquals(listOf(2, 2, 2), listOf("a", "b", "c").map(h::requestsTo))
         }
 }

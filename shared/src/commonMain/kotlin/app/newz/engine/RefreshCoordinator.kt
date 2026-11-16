@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Clock
@@ -31,11 +32,17 @@ class LoadResult(
 )
 
 /**
- * Runs feed loads one at a time (SPEC S5, S25). [refresh] while a load is running joins it: no
- * second fetch starts. A load whose followed sources all fail counts as offline. A load fetches the feeds followed when it starts, reporting each through
- * [onProgress], prunes the cache to [ArticleStore.ARTICLE_RETENTION] (and expired hides), then
- * re-reads the current [UserPrefs] and store into a [FeedSnapshot] and hands it to [onLoaded]
- * before the load completes.
+ * Runs feed loads one at a time (SPEC S5, S25). A load fetches the feeds followed when it starts,
+ * reporting each through [onProgress], prunes the cache to [ArticleStore.ARTICLE_RETENTION] (and
+ * expired hides), then re-reads the current [UserPrefs] and store into a [FeedSnapshot] and hands
+ * it to [onLoaded] before the load completes. A load whose followed sources all fail counts as
+ * offline.
+ *
+ * A [refresh] or [retry] while a load is still fetching joins it, and the load then also fetches
+ * every source followed since it started that it has not fetched yet (B38): a feed followed
+ * during the start-up load is fetched by it. Once a load's fetching is over it takes no more
+ * requests; one arriving then (a pull while the feed composes) queues a new load to run right
+ * after it (B45), so it is never folded into a load that has already read what it needed.
  */
 @OptIn(ExperimentalAtomicApi::class)
 class RefreshCoordinator(
@@ -49,7 +56,18 @@ class RefreshCoordinator(
     private val onProgress: suspend (FetchProgress) -> Unit = {},
     private val onLoaded: suspend (LoadResult) -> Unit = {},
 ) {
-    private val current = AtomicReference<Deferred<LoadResult>?>(null)
+    /**
+     * One load. [accepting] stays true while it may still widen its fetch; [widen] is set by a
+     * request that joined it. The pair is a handshake: a joiner sets [widen] then checks
+     * [accepting], the load clears [accepting] then checks [widen], so no join is ever lost.
+     */
+    private class Load(
+        val deferred: Deferred<LoadResult>,
+        val accepting: AtomicBoolean = AtomicBoolean(true),
+        val widen: AtomicBoolean = AtomicBoolean(false),
+    )
+
+    private val current = AtomicReference<Load?>(null)
     private val running = MutableStateFlow(false)
 
     /** True while a load runs. */
@@ -67,31 +85,69 @@ class RefreshCoordinator(
     private fun startOrJoin(only: String?): Deferred<LoadResult> {
         while (true) {
             val active = current.load()
-            if (active != null && active.isActive) return active
-            val next = scope.async(start = CoroutineStart.LAZY) { load(only) }
+            val after =
+                if (active != null && active.deferred.isActive) {
+                    active.widen.store(true)
+                    if (active.accepting.load()) return active.deferred
+                    // Its fetching is over: run a fresh load once it has finished.
+                    active.deferred
+                } else {
+                    null
+                }
+            // The load needs its own Load; it is set before the lazy coroutine can start.
+            val self = arrayOfNulls<Load>(1)
+            val deferred =
+                scope.async(start = CoroutineStart.LAZY) {
+                    after?.join()
+                    load(checkNotNull(self[0]), only)
+                }
+            val next = Load(deferred).also { self[0] = it }
             if (current.compareAndSet(active, next)) {
-                next.start()
-                return next
+                deferred.start()
+                return deferred
             }
-            next.cancel()
+            deferred.cancel()
         }
     }
 
-    private suspend fun load(only: String?): LoadResult {
+    private suspend fun followedNow(): List<FeedSource> {
+        val p = prefs.first()
+        return withContext(storeDispatcher) { FeedFetcher.followedSources(p, catalog, store.listCustomFeeds()) }
+    }
+
+    private suspend fun load(
+        self: Load,
+        only: String?,
+    ): LoadResult {
         running.value = true
         try {
-            val startPrefs = prefs.first()
-            val followed =
-                withContext(storeDispatcher) {
-                    FeedFetcher.followedSources(startPrefs, catalog, store.listCustomFeeds())
-                }
+            val followed = followedNow()
             val sources = if (only == null) followed else followed.filter { it.feedId == only }
+            val fetched = sources.mapTo(HashSet()) { it.feedId }
             var offline = false
             var anyOk = false
-            fetcher.fetch(sources).collect { progress ->
-                if (progress is FetchProgress.Offline) offline = true
-                if (progress is FetchProgress.FeedDone && progress.outcome is FeedOutcome.Ok) anyOk = true
-                onProgress(progress)
+
+            suspend fun fetch(list: List<FeedSource>) {
+                fetcher.fetch(list).collect { progress ->
+                    if (progress is FetchProgress.Offline) offline = true
+                    if (progress is FetchProgress.FeedDone && progress.outcome is FeedOutcome.Ok) anyOk = true
+                    onProgress(progress)
+                }
+            }
+            fetch(sources)
+            // Requests that joined meanwhile widen this load to every source followed now (B38).
+            // The last round runs after the load stops accepting, for one that joined just before.
+            var closed = false
+            while (true) {
+                if (!self.widen.exchange(false)) {
+                    if (closed) break
+                    self.accepting.store(false)
+                    closed = true
+                    continue
+                }
+                val missing = followedNow().filter { it.feedId !in fetched }
+                fetched += missing.map { it.feedId }
+                if (missing.isNotEmpty()) fetch(missing)
             }
             // Every source failing reads as offline (SPEC S25), so the cache shows with the banner.
             if (only == null && sources.isNotEmpty() && !anyOk) offline = true

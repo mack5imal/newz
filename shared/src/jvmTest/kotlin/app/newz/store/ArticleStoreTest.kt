@@ -2,6 +2,7 @@ package app.newz.store
 
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlDriver
+import app.newz.db.NewzDatabase
 import app.newz.feed.ParsedItem
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,6 +18,9 @@ class ArticleStoreTest {
     private val driver: SqlDriver = createSqlDriver()
     private var historyOn = true
     private val store = ArticleStore(driver) { historyOn }
+
+    /** The same database, for writing rows the store itself would refuse to write. */
+    private fun db() = NewzDatabase(driver)
 
     private fun item(
         guid: String,
@@ -42,6 +46,46 @@ class ArticleStoreTest {
         assertEquals(1, rows.size)
         assertEquals("New", rows.single().title)
         assertEquals(now, rows.single().firstSeenAt)
+    }
+
+    @Test
+    fun aDateFarInTheFutureIsTreatedAsUndated() {
+        // B42: a year typo or a wrong zone must not pin the story to the top.
+        assertEquals(now, insert("future", publishedAt = now + 300.days).publishedAt)
+        // A few minutes ahead is ordinary clock skew and is kept.
+        assertEquals(now + 10.minutes, insert("skew", publishedAt = now + 10.minutes).publishedAt)
+    }
+
+    @Test
+    fun aFutureDateSeenAgainDoesNotOverwriteTheStoredOne() {
+        insert("later", publishedAt = now - 1.days)
+        store.upsert("feed-1", "outlet-1", listOf("tech"), listOf(item("later", now + 300.days)), now + 1.minutes)
+        assertEquals(
+            now - 1.days,
+            store.article(ArticleIds.of("outlet-1", "later", "https://example.com/later"))!!.publishedAt,
+        )
+    }
+
+    @Test
+    fun aFutureDatedRowStoredEarlierIsPrunedByWhenItWasFirstSeen() {
+        // Rows written before the clamp can still carry a future date.
+        val at = now - 8.days
+        val id = ArticleIds.of("outlet-1", "old-future", "https://example.com/old-future")
+        db().articleQueries.insertIfAbsent(
+            id,
+            "feed-1",
+            "outlet-1",
+            "old-future",
+            "https://example.com/old-future",
+            "T",
+            null,
+            null,
+            (now + 300.days).toEpochMilliseconds(),
+            at.toEpochMilliseconds(),
+            "[]",
+        )
+        store.pruneOlderThan(ArticleStore.ARTICLE_RETENTION, now)
+        assertNull(store.article(id))
     }
 
     @Test

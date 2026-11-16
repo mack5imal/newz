@@ -66,7 +66,7 @@ object FeedRanker {
                     band(now - minOf(g.lead.date, now), prefs.levelOf(topic)) to topic
                 }.map { (key, list) ->
                     val (band, topic) = key
-                    Queue(band, topic, list.sortedWith(newestFirst).toMutableList(), stride(prefs, topic))
+                    Queue(band, topic, list.sortedWith(newestFirst), stride(prefs, topic))
                 }
         val order = prefs.followedTopics.withIndex().associate { (i, t) -> t to i }
         val byTurn =
@@ -78,33 +78,37 @@ object FeedRanker {
 
         val out = ArrayList<StoryGroup>(groups.size)
         val recent = ArrayDeque<String>()
+        // Cards per outlet among [recent], so the spread check is a lookup, not a count (B39).
+        val inWindow = HashMap<String, Int>()
+
+        fun blocked(outletId: String) = (inWindow[outletId] ?: 0) >= MAX_PER_WINDOW
         while (true) {
-            val live = queues.filter { it.items.isNotEmpty() }.sortedWith(byTurn)
+            val live = queues.filter { !it.isEmpty() }.sortedWith(byTurn)
             if (live.isEmpty()) break
             val (current, later) = live.partition { it.band == live.first().band }
 
-            fun fits(g: StoryGroup) = recent.count { it == g.lead.outletId } < MAX_PER_WINDOW
-
-            fun headOf(qs: List<Queue>) = qs.firstOrNull { fits(it.head) }?.let { it to 0 }
+            fun headOf(qs: List<Queue>) =
+                qs.firstOrNull { !blocked(it.head.lead.outletId) }?.let { it to it.headIndex() }
 
             fun laterCardOf(qs: List<Queue>) =
-                qs.firstNotNullOfOrNull { q ->
-                    q.items
-                        .indexOfFirst(::fits)
-                        .takeIf { it >= 0 }
-                        ?.let { q to it }
-                }
+                qs.firstNotNullOfOrNull { q -> q.firstUnblocked(::blocked)?.let { q to it } }
             val (queue, index) =
                 headOf(current)
                     ?: laterCardOf(current)
                     ?: headOf(later)
                     ?: laterCardOf(later)
-                    ?: (current.first() to 0)
-            val picked = queue.items.removeAt(index)
+                    ?: current.first().let { it to it.headIndex() }
+            val picked = queue.remove(index)
             queue.pass += queue.stride
             out += picked
-            recent.addLast(picked.lead.outletId)
-            if (recent.size > SPREAD_WINDOW - 1) recent.removeFirst()
+            val outletId = picked.lead.outletId
+            recent.addLast(outletId)
+            inWindow[outletId] = (inWindow[outletId] ?: 0) + 1
+            if (recent.size > SPREAD_WINDOW - 1) {
+                val left = recent.removeFirst()
+                val n = inWindow.getValue(left) - 1
+                if (n == 0) inWindow.remove(left) else inWindow[left] = n
+            }
         }
         return out
     }
@@ -114,14 +118,115 @@ object FeedRanker {
         topic: String,
     ): Long = STRIDE_BASE / weight(prefs.levelOf(topic))
 
+    /**
+     * One topic's cards in one band, newest first, from which cards are removed anywhere. "The
+     * first card whose outlet is not blocked" used to scan the whole queue, so ranking went
+     * quadratic once one outlet filled the spread window (B39). Instead each outlet keeps the
+     * positions of its cards, and a heap holds each outlet's first remaining position. Only a
+     * few outlets can be blocked at once, so only those few heap entries are ever skipped.
+     */
     private class Queue(
         val band: Int,
         val topic: String,
-        val items: MutableList<StoryGroup>,
+        private val items: List<StoryGroup>,
         val stride: Long,
     ) {
         var pass = 0L
 
-        val head: StoryGroup get() = items.first()
+        private val alive = BooleanArray(items.size) { true }
+        private var remaining = items.size
+        private var headCursor = 0
+
+        /** Each outlet's card positions, ascending, and the index of its first remaining one. */
+        private val positions: Map<String, IntArray> =
+            items.indices.groupBy { items[it].lead.outletId }.mapValues { it.value.toIntArray() }
+        private val cursor = HashMap<String, Int>().apply { positions.keys.forEach { put(it, 0) } }
+        private val heads = IntHeap().apply { positions.values.forEach { push(it[0]) } }
+
+        fun isEmpty(): Boolean = remaining == 0
+
+        fun headIndex(): Int {
+            while (!alive[headCursor]) headCursor++
+            return headCursor
+        }
+
+        val head: StoryGroup get() = items[headIndex()]
+
+        private fun outletOf(i: Int) = items[i].lead.outletId
+
+        /** The outlet's first remaining position, or -1. */
+        private fun firstOf(outletId: String): Int {
+            val list = positions.getValue(outletId)
+            val c = cursor.getValue(outletId)
+            return if (c < list.size) list[c] else -1
+        }
+
+        /** The first remaining position whose outlet [blocked] lets through, or null. */
+        fun firstUnblocked(blocked: (String) -> Boolean): Int? {
+            val skipped = ArrayList<Int>()
+            var found: Int? = null
+            while (!heads.isEmpty()) {
+                val i = heads.pop()
+                if (firstOf(outletOf(i)) != i) continue // stale: that card is gone
+                skipped += i
+                if (!blocked(outletOf(i))) {
+                    found = i
+                    break
+                }
+            }
+            skipped.forEach(heads::push)
+            return found
+        }
+
+        fun remove(i: Int): StoryGroup {
+            alive[i] = false
+            remaining--
+            val outletId = outletOf(i)
+            if (firstOf(outletId) == i) {
+                val list = positions.getValue(outletId)
+                var c = cursor.getValue(outletId)
+                while (c < list.size && !alive[list[c]]) c++
+                cursor[outletId] = c
+                if (c < list.size) heads.push(list[c])
+            }
+            return items[i]
+        }
+    }
+
+    /** A binary min-heap of ints; common code has no PriorityQueue. */
+    private class IntHeap {
+        private var a = IntArray(16)
+        private var size = 0
+
+        fun isEmpty() = size == 0
+
+        fun push(v: Int) {
+            if (size == a.size) a = a.copyOf(size * 2)
+            var i = size++
+            a[i] = v
+            while (i > 0) {
+                val p = (i - 1) / 2
+                if (a[p] <= a[i]) break
+                a[p] = a[i].also { a[i] = a[p] }
+                i = p
+            }
+        }
+
+        fun pop(): Int {
+            val top = a[0]
+            a[0] = a[--size]
+            var i = 0
+            while (true) {
+                val l = 2 * i + 1
+                val r = l + 1
+                var m = i
+                if (l < size && a[l] < a[m]) m = l
+                if (r < size && a[r] < a[m]) m = r
+                if (m == i) break
+                a[m] = a[i].also { a[i] = a[m] }
+                i = m
+            }
+            return top
+        }
     }
 }

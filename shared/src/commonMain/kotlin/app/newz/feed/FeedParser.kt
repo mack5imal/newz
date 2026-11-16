@@ -35,6 +35,19 @@ object FeedParser {
     /** A feed with thousands of items is cut to its newest [MAX_ITEMS] (the feed only shows 7 days). */
     const val MAX_ITEMS = 300
 
+    /**
+     * The longest summary kept (B35), cut on a word boundary. Full-text feeds put whole article
+     * bodies in `<description>`; a card shows a few lines, and grouping reads only the opening.
+     */
+    const val MAX_SUMMARY_CHARS = 400
+
+    /** [text] cut to at most [MAX_SUMMARY_CHARS] at the last space, with an ellipsis when cut. */
+    internal fun capSummary(text: String): String {
+        if (text.length <= MAX_SUMMARY_CHARS) return text
+        val cut = text.lastIndexOf(' ', MAX_SUMMARY_CHARS).takeIf { it > 0 } ?: MAX_SUMMARY_CHARS
+        return text.substring(0, cut).trimEnd() + "…"
+    }
+
     private val PROLOG = Regex("^\\s*<\\?xml[^>]*\\?>")
     private val PROLOG_ENCODING = Regex("^\\s*<\\?xml[^>]*encoding\\s*=\\s*[\"']([A-Za-z0-9._:-]+)[\"']")
 
@@ -42,8 +55,20 @@ object FeedParser {
     private val DOCTYPE = Regex("<!DOCTYPE[^\\[>]*(\\[[\\s\\S]*?])?\\s*>", RegexOption.IGNORE_CASE)
     private val DECLARATION = Regex("<!(DOCTYPE|ENTITY)", RegexOption.IGNORE_CASE)
     private val ROOT = Regex("<([A-Za-z_][\\w.-]*:)?(rss|feed|RDF)\\b")
-    private val IMG_SRC =
-        Regex("<img\\b[^>]*?\\bsrc\\s*=\\s*(\"([^\"]*)\"|'([^']*)'|([^\\s>]+))", RegexOption.IGNORE_CASE)
+    private val IMG_TAG = Regex("<img\\b[^>]*>", RegexOption.IGNORE_CASE)
+    private val IMG_SRC_ATTR = imgAttribute("src")
+    private val IMG_WIDTH_ATTR = imgAttribute("width")
+    private val IMG_HEIGHT_ATTR = imgAttribute("height")
+
+    /** Addresses that read like a tracking pixel: a pixel/beacon/spacer file, or a beacon path. */
+    private val TRACKING_SRC =
+        Regex(
+            "(pixel|beacon|spacer|blank|1x1)[^/?#]*\\.(gif|png)([?#]|$)|/(pixel|beacon|track|tracking)(/|\\?|$)",
+            RegexOption.IGNORE_CASE,
+        )
+
+    private fun imgAttribute(name: String) =
+        Regex("\\s$name\\s*=\\s*(\"([^\"]*)\"|'([^']*)'|([^\\s>]+))", RegexOption.IGNORE_CASE)
 
     /**
      * Parses [bytes]. The charset comes from the XML prolog, else [contentTypeCharset] (the HTTP
@@ -56,7 +81,7 @@ object FeedParser {
         val xml = prepareXml(decode(bytes, contentTypeCharset))
         // A DOCTYPE the pattern could not remove whole leaves a declaration behind: refuse the feed
         // rather than let any parser see an entity definition (no XXE, no entity expansion).
-        if (DECLARATION.containsMatchIn(xml)) throw FeedParseException("Feed declares a DTD or entities")
+        if (declaresEntities(xml)) throw FeedParseException("Feed declares a DTD or entities")
         val kind = detectKind(xml) ?: throw FeedParseException("Not an RSS, Atom or RDF document")
         val channel =
             try {
@@ -68,8 +93,18 @@ object FeedParser {
             title = HtmlText.toPlainText(channel.title.orEmpty()),
             siteUrl = channel.link?.trim()?.ifEmpty { null },
             kind = kind,
-            items = newest(channel.items.mapNotNull(::toItem)),
+            items = newest(distinctGuids(channel.items.mapNotNull(::toItem))),
         )
+    }
+
+    /**
+     * Items whose guid another item with a different link shares get their link as guid (B41).
+     * The article id is a hash of outlet and guid, so a feed that stamps every item with, say,
+     * the site's address would otherwise show as one card that changes on every refresh.
+     */
+    internal fun distinctGuids(items: List<ParsedItem>): List<ParsedItem> {
+        val urlsByGuid = items.groupBy({ it.guid }) { it.url }.mapValues { (_, urls) -> urls.toSet() }
+        return items.map { if ((urlsByGuid[it.guid]?.size ?: 0) > 1) it.copy(guid = it.url) else it }
     }
 
     /** At most [MAX_ITEMS] items per feed: the newest ones (undated count as oldest), in feed order. */
@@ -101,6 +136,32 @@ object FeedParser {
         return Charsets.decode(bytes, label)
     }
 
+    /**
+     * True when `<!DOCTYPE` or `<!ENTITY` appears as markup, that is outside comments and CDATA
+     * sections (B44). Quoted inside CDATA it is only text, as in a post about XXE, and refusing
+     * it would reject the whole feed. An unterminated comment or CDATA section is not trusted to
+     * hide anything: the rest of the document is checked as it is.
+     */
+    internal fun declaresEntities(xml: String): Boolean {
+        var i = 0
+        while (true) {
+            val lt = xml.indexOf('<', i)
+            if (lt < 0) return false
+            val skipTo =
+                when {
+                    xml.startsWith("<!--", lt) -> xml.indexOf("-->", lt + 4).let { if (it < 0) -1 else it + 3 }
+                    xml.startsWith("<![CDATA[", lt) -> xml.indexOf("]]>", lt + 9).let { if (it < 0) -1 else it + 3 }
+                    else -> null
+                }
+            when {
+                skipTo == -1 -> return DECLARATION.containsMatchIn(xml.substring(lt + 1))
+                skipTo != null -> i = skipTo
+                DECLARATION.matchAt(xml, lt) != null -> return true
+                else -> i = lt + 1
+            }
+        }
+    }
+
     /** The text is already decoded, so the prolog's encoding must not be applied a second time. */
     private fun prepareXml(text: String): String = DOCTYPE.replace(PROLOG.replace(text.removePrefix("\uFEFF"), ""), "")
 
@@ -124,7 +185,7 @@ object FeedParser {
             guid = item.guid?.trim()?.ifEmpty { null } ?: url,
             url = url,
             title = title,
-            summary = body?.let(HtmlText::toPlainText)?.ifEmpty { null },
+            summary = body?.let(HtmlText::toPlainText)?.ifEmpty { null }?.let(::capSummary),
             imageUrl = imageOf(item),
             publishedAt = FeedDates.parse(item.pubDate),
         )
@@ -139,19 +200,55 @@ object FeedParser {
                 (type == null && medium == null) || type?.startsWith("image/") == true || medium == "image"
             }
         val enclosure = item.rawEnclosure?.takeIf { it.type?.startsWith("image/") == true }
-        val candidates =
-            sequenceOf(media?.url, item.image, enclosure?.url) +
-                sequenceOf(item.content, item.description).map { html ->
-                    html
-                        ?.let { IMG_SRC.find(it) }
-                        ?.groupValues
-                        ?.drop(2)
-                        ?.firstOrNull { v -> v.isNotEmpty() }
-                }
+        val tags = sequenceOf(item.content, item.description).filterNotNull().flatMap { IMG_TAG.findAll(it) }
+        val pixels = tags.mapNotNull { tag -> attribute(tag.value, IMG_SRC_ATTR)?.takeIf { isPixel(tag.value, it) } }
+        // RSS-Parser fills item.image from the description's first <img> itself, so the same
+        // pixel test applies to it.
+        val parsedImage =
+            item.image?.takeUnless { image ->
+                TRACKING_SRC.containsMatchIn(image) ||
+                    pixels.any { it.trim() == image.trim() }
+            }
+        val firstPicture =
+            tags
+                .mapNotNull { tag ->
+                    attribute(tag.value, IMG_SRC_ATTR)?.takeUnless { isPixel(tag.value, it) }
+                }.firstOrNull()
+        val candidates = sequenceOf(media?.url, parsedImage, enclosure?.url, firstPicture)
         return candidates
             .mapNotNull { normalizeImageUrl(it) }
             .firstOrNull()
     }
+
+    /**
+     * True when an `<img>` is a tracking pixel (B40): declared at 2 px or less, or with an
+     * address that reads like a beacon. Loading one would tell its host which article the user
+     * scrolled past, which is exactly what Newz promises not to allow.
+     */
+    private fun isPixel(
+        tag: String,
+        src: String,
+    ): Boolean {
+        val tiny =
+            listOf(IMG_WIDTH_ATTR, IMG_HEIGHT_ATTR).any { attr ->
+                attribute(tag, attr)
+                    ?.trim()
+                    ?.removeSuffix("px")
+                    ?.toIntOrNull()
+                    ?.let { it <= 2 } == true
+            }
+        return tiny || TRACKING_SRC.containsMatchIn(src)
+    }
+
+    private fun attribute(
+        tag: String,
+        pattern: Regex,
+    ): String? =
+        pattern
+            .find(tag)
+            ?.groupValues
+            ?.drop(2)
+            ?.firstOrNull { it.isNotEmpty() }
 
     private fun normalizeImageUrl(raw: String?): String? {
         val decoded = raw?.let(HtmlText::decodeEntities)?.trim().orEmpty()

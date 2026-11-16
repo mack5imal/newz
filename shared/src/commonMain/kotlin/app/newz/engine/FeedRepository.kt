@@ -1,6 +1,7 @@
 package app.newz.engine
 
 import app.newz.catalog.Catalog
+import app.newz.dedup.StoryGroup
 import app.newz.feed.Article
 import app.newz.filter.FEED_WINDOW
 import app.newz.net.newzHttpClient
@@ -123,6 +124,13 @@ class FeedRepository(
     private var failing: Set<String> = emptySet()
     private var savedIds: Set<String> = emptySet()
     private var composedPrefs: UserPrefs? = null
+
+    /** Drops publishes of snapshots older than the one shown (B46). Guarded by [lock]. */
+    private val publishOrder = PublishOrder()
+
+    /** The groups and article ids of the publish shown, for a late re-rank. Guarded by [lock]. */
+    private var shownGroups: List<StoryGroup> = emptyList()
+    private var shownArticleIds: Set<String> = emptySet()
 
     private val composeCount = AtomicInt(0)
 
@@ -300,19 +308,38 @@ class FeedRepository(
         lock.withLock {
             if (whileGrowing && !growing) return
             val rerank = if (whileGrowing) reset && !userMoved else reset
-            if (rerank) {
-                pager.reset(groups)
-                baselineIds = snapshot.articles.mapTo(HashSet()) { it.id }
-                newStories = 0
-            } else {
-                pager.submit(groups)
-                // Only stories a re-rank would bring onto the first page: an older article seen for
-                // the first time (a slow feed catching up) is not news at the top.
-                newStories = groups.take(pager.pageSize).count { g -> g.members().any { it.id !in baselineIds } }
+            // A snapshot older than the one shown leaves the cards, saved set and prefs alone (B46);
+            // the state below is still recomputed, so a late final publish still ends "loading".
+            when (publishOrder.decide(snapshot.sequence, rerank)) {
+                PublishOrder.Decision.DROP -> {
+                    Unit
+                }
+
+                PublishOrder.Decision.RERANK_SHOWN -> {
+                    pager.reset(shownGroups)
+                    baselineIds = shownArticleIds
+                    newStories = 0
+                }
+
+                PublishOrder.Decision.APPLY -> {
+                    shownGroups = groups
+                    shownArticleIds = snapshot.articles.mapTo(HashSet()) { it.id }
+                    if (rerank) {
+                        pager.reset(groups)
+                        baselineIds = shownArticleIds
+                        newStories = 0
+                    } else {
+                        pager.submit(groups)
+                        // Only stories a re-rank would bring onto the first page: an older article
+                        // seen for the first time (a slow feed catching up) is not news at the top.
+                        newStories =
+                            groups.take(pager.pageSize).count { g -> g.members().any { it.id !in baselineIds } }
+                    }
+                    savedIds = snapshot.savedIds
+                    composedPrefs = snapshot.prefs
+                }
             }
             if (pager.servedGroups.size < pager.pageSize) pager.page(0)
-            savedIds = snapshot.savedIds
-            composedPrefs = snapshot.prefs
             state.value =
                 when {
                     pager.servedGroups.isNotEmpty() -> content()

@@ -9,6 +9,7 @@ import kotlinx.serialization.json.Json
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import app.newz.db.Article as ArticleRow
 import app.newz.db.Feed_status as FeedStatusRow
@@ -47,7 +48,12 @@ class ArticleStore(
         db.transaction {
             for (item in items) {
                 val id = ArticleIds.of(outletId, item.guid, item.url)
-                val publishedAt = item.publishedAt?.toEpochMilliseconds()
+                // A date well past now is a typo or a wrong zone, not news from the future (B42):
+                // read it as undated, which would otherwise rank as "now" until the date passed.
+                val publishedAt =
+                    item.publishedAt
+                        ?.toEpochMilliseconds()
+                        ?.takeIf { it <= seenAt + FUTURE_DATE_TOLERANCE.inWholeMilliseconds }
                 // Every sighting is kept, not just the first (B31): the same story in two of an
                 // outlet's sections is one row, and unfollowing one section must not hide it.
                 db.articleFeedQueries.upsert(id, feedId, topicsText)
@@ -356,6 +362,9 @@ class ArticleStore(
          * read twice, and long enough to spot an outlet's logo standing in for its pictures.
          */
         val PAGE_IMAGE_RETENTION: Duration = 30.days
+
+        /** How far ahead of now a feed's date may be (clock skew) before it is treated as undated. */
+        val FUTURE_DATE_TOLERANCE: Duration = 15.minutes
 
         /** How long reading history is kept: long enough for affinity to reflect habits, not forever. */
         val HISTORY_RETENTION: Duration = 180.days

@@ -34,5 +34,7 @@ SELECT * FROM article WHERE id = ?;
 selectAll:
 SELECT * FROM article ORDER BY publishedAt DESC, id;
 
+-- The earlier of the two dates decides (B42), so a row stored with a future publishedAt still
+-- leaves the cache a week after it was first seen.
 pruneBefore:
-DELETE FROM article WHERE publishedAt < :cutoff AND id NOT IN (SELECT articleId FROM saved);
+DELETE FROM article WHERE min(publishedAt, firstSeenAt) < :cutoff AND id NOT IN (SELECT articleId FROM saved);

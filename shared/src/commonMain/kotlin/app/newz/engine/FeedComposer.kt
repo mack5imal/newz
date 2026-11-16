@@ -10,6 +10,9 @@ import app.newz.store.ArticleStore
 import app.newz.store.FeedSighting
 import app.newz.store.StoredArticle
 import app.newz.store.UserPrefs
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.incrementAndFetch
 import kotlin.time.Instant
 
 /**
@@ -25,8 +28,18 @@ class FeedSnapshot(
     val affinity: ReadingAffinity,
     /** Every feed each article was seen in (B31), by article id; missing ids have only their own. */
     val sightings: Map<String, List<FeedSighting>> = emptyMap(),
+    /**
+     * When this snapshot was taken relative to the others (B46). Snapshots are read one at a
+     * time on the store's dispatcher, so a larger number is a newer read.
+     */
+    val sequence: Long = nextSequence(),
 ) {
+    @OptIn(ExperimentalAtomicApi::class)
     companion object {
+        private val counter = AtomicLong(0)
+
+        private fun nextSequence(): Long = counter.incrementAndFetch()
+
         /** Reads [store] now. Call it on the store's dispatcher. */
         fun read(
             store: ArticleStore,

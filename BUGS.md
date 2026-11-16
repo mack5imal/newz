@@ -12,6 +12,81 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 
 ## Fixed
 
+### B35 — Full-text summaries merge unrelated stories into one card and slow grouping (R7)
+- **Severity:** Medium
+- **Where:** `shared/.../feed/FeedParser.kt` (`toItem`), `dedup/StoryGrouper.kt`
+- **Seen:** in review. Summaries are stored uncapped; 300-word bodies collapse a 5,000-article feed
+  into 65 groups and grouping takes six times longer.
+- **Fixed in:** `bbbca8a` (summaries capped at 400 characters; grouping reads the headline and the first 40 summary words).
+
+### B36 — ISO dates with +0000, no seconds or a space before the offset fail to parse (R8)
+- **Severity:** Medium
+- **Where:** `shared/.../feed/FeedDates.kt` (`parseIso`, `parseRfc822`)
+- **Seen:** in review. Such items get "now" as their date, so weeks-old stories show as new.
+- **Fixed in:** `e6f3b1f` (one ISO pattern for +0000, +05, no seconds, a spaced offset and a trailing comment).
+
+### B37 — Unknown RFC 822 zone abbreviations are read as UTC (R9)
+- **Severity:** Medium
+- **Where:** `FeedDates.kt` (`zoneOffsetSeconds`)
+- **Seen:** in review. AEDT, BST, CET and others parse as +00:00, so items land hours off.
+- **Fixed in:** `e6f3b1f` (unknown zone abbreviations give no date; common non-US zones added, IST left out as ambiguous).
+
+### B38 — A refresh that joins a running load skips feeds followed after it started (R10)
+- **Severity:** Medium
+- **Where:** `shared/.../engine/RefreshCoordinator.kt` (`startOrJoin`, `load`)
+- **Seen:** in review. Following an outlet during the start-up load shows nothing from it until a
+  manual pull.
+- **Fixed in:** `5f5fc31` (a joined load widens to every source followed by the time it finishes fetching).
+
+### B39 — Ranking is quadratic when one outlet dominates the feed (R11)
+- **Severity:** Medium
+- **Where:** `shared/.../engine/FeedRanker.kt` (`rank`)
+- **Seen:** in review. 12,000 groups with 80% from one outlet take about a second per compose.
+- **Fixed in:** `3975bc1` (per-outlet window counts and an outlet-indexed queue; same order, checked against the original; ~65 ms for 12,000 groups).
+
+### B40 — A tracking pixel can become the card picture (R15)
+- **Severity:** Low
+- **Where:** `FeedParser.kt` (`imageOf`)
+- **Seen:** in review. The first `<img>` is used even when it is a 1x1 beacon.
+- **Fixed in:** `897a088` (images declared at 2 px or less, or with beacon-like addresses, are skipped, also as RSS-Parser's item image).
+
+### B41 — Items sharing one guid collapse into a single card (R18)
+- **Severity:** Low
+- **Where:** `FeedParser.kt` (`parse`), `store/StoreModels.kt` (`ArticleIds`)
+- **Seen:** in review. A feed that gives every item the same guid shows one card.
+- **Fixed in:** `bdffe27` (a guid shared by items with different links falls back to each link).
+
+### B42 — Future-dated articles sit at the top and are never pruned (R23)
+- **Severity:** Low
+- **Where:** `store/ArticleStore.kt` (`upsert`), `filter/FeedFilter.kt`, `Article.sq`
+- **Seen:** in review. An item dated next year ranks as "now" until a week after that date.
+- **Fixed in:** `5f39873` (dates more than 15 min ahead are stored as undated; prune uses the earlier of the two dates).
+
+### B43 — Muting "Tim" hides "times" (R24)
+- **Severity:** Low
+- **Where:** `shared/.../filter/KeywordMatcher.kt` (`ENDINGS`)
+- **Seen:** in review. The "es" ending is allowed after any letter.
+- **Fixed in:** `a5e3251` ("es" only after s, x, z, ch, sh or o, and not after a two-letter word in s).
+
+### B44 — `<!ENTITY` quoted inside CDATA rejects the whole feed (R25)
+- **Severity:** Low
+- **Where:** `FeedParser.kt` (`DECLARATION`)
+- **Seen:** in review. The declaration check scans the whole document, CDATA included.
+- **Fixed in:** `d6c3161` (declarations are looked for only as markup, outside comments and CDATA).
+
+### B45 — A pull during a finishing load's last compose loses its re-rank (R26)
+- **Severity:** Low
+- **Where:** `shared/.../engine/FeedRepository.kt` (`onLoaded`, `refresh`)
+- **Seen:** in review. The pull joins a load that has already read the re-rank flag; the flag
+  leaks into the next load.
+- **Fixed in:** `5f5fc31` (a request after a load's fetching is over queues a new load instead of joining).
+
+### B46 — An older feed composition can overwrite a newer one (R27)
+- **Severity:** Low
+- **Where:** `FeedRepository.kt` (`publish`)
+- **Seen:** in review. Composes finish in any order, so a hidden card can reappear.
+- **Fixed in:** `1ce20fe` (snapshots carry their read order; an older publish keeps the shown cards but still updates the state).
+
 ### B29 — Importing a backup silently deletes reading history and recently saved articles (R4)
 - **Severity:** High (data loss)
 - **Where:** `shared/.../store/BackupCodec.kt` (`BackupRestorer.restore`),

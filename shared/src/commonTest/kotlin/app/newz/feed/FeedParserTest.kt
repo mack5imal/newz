@@ -128,6 +128,35 @@ class FeedParserTest {
     }
 
     @Test
+    fun isoDatesInTheFormsFeedsReallyUse() {
+        // B36: each of these used to parse to null, so the item looked brand new.
+        val ten = Instant.parse("2026-11-16T10:00:00Z")
+        assertEquals(ten, FeedDates.parse("2026-11-16T10:00:00+0000"))
+        assertEquals(ten, FeedDates.parse("2026-11-16T10:00Z"))
+        assertEquals(ten, FeedDates.parse("2026-11-16 10:00:00 +0000"))
+        assertEquals(ten, FeedDates.parse("2026-11-16T15:30:00+05:30"))
+        assertEquals(ten, FeedDates.parse("2026-11-16T05:00:00-05"))
+        assertEquals(Instant.parse("2026-11-16T04:30:00.123Z"), FeedDates.parse("2026-11-16T10:00:00.123+0530"))
+        assertEquals(ten, FeedDates.parse("Mon, 16 Nov 2026 10:00:00 +0000 (UTC)"))
+        // Unchanged: no zone still reads as UTC.
+        assertEquals(ten, FeedDates.parse("2026-11-16T10:00:00"))
+        assertNull(FeedDates.parse("2026-11-16T25:00:00Z"))
+    }
+
+    @Test
+    fun rfc822ZoneAbbreviationsOutsideTheUsAreReadOrRefused() {
+        // B37: an unknown abbreviation used to be read as UTC.
+        assertEquals(Instant.parse("2026-11-16T21:00:00Z"), FeedDates.parse("Tue, 17 Nov 2026 08:00:00 AEDT"))
+        assertEquals(Instant.parse("2026-07-16T09:00:00Z"), FeedDates.parse("Thu, 16 Jul 2026 10:00:00 BST"))
+        assertEquals(Instant.parse("2026-11-16T09:00:00Z"), FeedDates.parse("Mon, 16 Nov 2026 10:00:00 CET"))
+        assertEquals(Instant.parse("2026-11-16T01:00:00Z"), FeedDates.parse("Mon, 16 Nov 2026 10:00:00 JST"))
+        assertEquals(Instant.parse("2026-11-16T00:30:00Z"), FeedDates.parse("Mon, 16 Nov 2026 10:00:00 ACST"))
+        // Ambiguous (Irish, Israeli or Indian time) or unknown: no date, so firstSeenAt is used.
+        assertNull(FeedDates.parse("Mon, 16 Nov 2026 10:00:00 IST"))
+        assertNull(FeedDates.parse("Mon, 16 Nov 2026 10:00:00 XYZ"))
+    }
+
+    @Test
     fun nonFeedIsRejected() =
         runTest {
             assertFailsWith<FeedParseException> { parse("<html><body>Not a feed</body></html>") }
