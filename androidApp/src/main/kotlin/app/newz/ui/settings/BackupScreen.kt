@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import app.newz.ui.components.Button
 import app.newz.ui.components.ButtonVariant
 import app.newz.ui.components.Checkbox
+import app.newz.ui.components.ConfirmSheet
 import app.newz.ui.components.NoteRow
 import app.newz.ui.components.Panel
 import app.newz.ui.components.PlainText
@@ -46,6 +47,7 @@ fun BackupScreen(
 ) {
     val includeHistory by viewModel.includeHistory.collectAsState()
     val note by viewModel.note.collectAsState()
+    val pendingImport by viewModel.pendingImport.collectAsState()
     val resolver = LocalContext.current.applicationContext.contentResolver
     var exportName by rememberSaveable { mutableStateOf("") }
     val exporter =
@@ -102,7 +104,9 @@ fun BackupScreen(
         }
         Panel(title = "Import") {
             PlainText(
-                text = "Restore choices from a Newz backup file. They replace the choices on this phone.",
+                text =
+                    "Restore choices from a Newz backup file. They replace the choices and saved " +
+                        "articles on this phone; you’ll be asked first.",
                 style = NewzTokens.typeRowSub,
                 color = c.ink,
                 modifier =
@@ -145,5 +149,14 @@ fun BackupScreen(
                 else -> {}
             }
         }
+    }
+    pendingImport?.let { pending ->
+        ConfirmSheet(
+            title = "Replace this phone’s choices?",
+            message = importConfirmMessage(pending),
+            confirmLabel = "Replace",
+            onConfirm = viewModel::confirmImport,
+            onDismiss = viewModel::cancelImport,
+        )
     }
 }

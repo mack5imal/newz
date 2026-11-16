@@ -16,6 +16,9 @@ import app.newz.net.newzHttpClient
 import app.newz.platform.ArticleOpener
 import app.newz.platform.ShareLauncher
 import app.newz.store.ArticleStore
+import app.newz.store.BackupContents
+import app.newz.store.BackupCounts
+import app.newz.store.BackupRestorer
 import app.newz.store.NewzStorage
 import app.newz.store.PreferencesStore
 import app.newz.store.ThemeMode
@@ -23,8 +26,10 @@ import app.newz.ui.image.NewzImageLoader
 import coil3.ImageLoader
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -166,6 +171,20 @@ class AppGraph private constructor(
      * never written to preferences; the feed's ViewModel reads and updates it.
      */
     var topicSelection: Set<String> = emptySet()
+
+    /**
+     * Restores [contents] in the app's own scope rather than a screen's (B33), so leaving Backup
+     * while it runs cannot cut it short. Then the feed shows the restored choices at once and
+     * fetches the restored sources (B30): a backup usually follows sources the cache has never
+     * fetched. The feed re-ranks, as after a pull.
+     */
+    fun restoreBackup(contents: BackupContents): Deferred<Result<BackupCounts>> =
+        scope.async(Dispatchers.IO) {
+            BackupRestorer(articleStore, preferencesStore).restore(contents).also { result ->
+                feedRepository.invalidate()
+                if (result.isSuccess) feedRepository.refresh(rerank = true)
+            }
+        }
 
     private fun dispose(closeDriver: Boolean) {
         scope.cancel()

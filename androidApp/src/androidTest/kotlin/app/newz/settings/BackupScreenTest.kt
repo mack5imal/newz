@@ -118,6 +118,11 @@ class BackupScreenTest {
         compose.onNode(hasText(label) and hasClickAction()).performScrollTo().performClick()
     }
 
+    /** A button on a sheet: sheets do not scroll, so there is nothing to scroll it into view in. */
+    private fun tapInSheet(label: String) {
+        compose.onNode(hasText(label) and hasClickAction()).performClick()
+    }
+
     /** Taps "Export to a file" with the picker answering [file]; returns the written JSON. */
     private fun exportTo(file: File): String {
         stubPickers(file)
@@ -213,9 +218,18 @@ class BackupScreenTest {
         compose.waitForStableFeed(minCards = 1)
         openBackup()
 
+        val freshPrefs = currentPrefs()
         stubPickers(file)
         tap("Choose a backup file")
+        // B29: nothing is replaced until the user confirms what will be lost.
+        compose.waitForText("Replace this phone’s choices?", TIMEOUT)
+        compose.onNodeWithText("your 0 saved articles with its 1", substring = true).assertExists()
+        assertEquals(freshPrefs, currentPrefs())
+        val requestsBefore = server.requests.get()
+        tapInSheet("Replace")
         compose.waitForText("Backup imported", TIMEOUT)
+        // B30: the restored sources are fetched straight away, not on the next pull.
+        compose.waitUntil(TIMEOUT) { server.requests.get() > requestsBefore }
         compose
             .onNodeWithText(
                 "Restored 7 sources, 6 topics, 1 muted keywords, 1 hidden and 1 saved articles.",
@@ -238,6 +252,35 @@ class BackupScreenTest {
         assertEquals(savedBefore, restored.listSaved())
         assertEquals(customBefore, restored.listCustomFeeds())
         assertEquals(historyBefore.toSet(), restored.listHistory().toSet())
+    }
+
+    @Test
+    fun cancellingTheConfirmSheetChangesNothing() {
+        server.fill(itemsPerFeed = 3)
+        start()
+        seedChoices()
+        openBackup()
+        val file = testFile("cancel")
+        exportTo(file)
+        val store = AppGraph.get().articleStore
+        val prefsBefore = currentPrefs()
+        val savedBefore = store.listSaved()
+        val historyBefore = store.listHistory()
+        // Change the phone after the export, so a restore would visibly undo it.
+        TestPrefs.write(prefsBefore.copy(zip = "10001"))
+
+        stubPickers(file)
+        tap("Choose a backup file")
+        compose.waitForText("Replace this phone’s choices?", TIMEOUT)
+        compose.onNodeWithText("Your reading history on this phone stays as it is.", substring = true).assertExists()
+        tapInSheet("Cancel")
+        compose.waitUntil(TIMEOUT) {
+            compose.onAllNodes(hasText("Replace this phone’s choices?")).fetchSemanticsNodes().isEmpty()
+        }
+        assertEquals("10001", currentPrefs().zip)
+        assertEquals(savedBefore, store.listSaved())
+        assertEquals(historyBefore, store.listHistory())
+        assertTrue(compose.onAllNodes(hasText("Backup imported")).fetchSemanticsNodes().isEmpty())
     }
 
     @Test

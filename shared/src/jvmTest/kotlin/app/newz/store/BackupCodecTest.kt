@@ -1,6 +1,8 @@
 package app.newz.store
 
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import kotlin.test.Test
@@ -178,6 +180,19 @@ class BackupCodecTest {
         }
 
     @Test
+    fun aBackupWithoutHistoryKeepsThePhonesHistory() =
+        runTest {
+            // B29: export leaves history out by default, so importing such a file must not
+            // read as "this backup has no history" and wipe the phone's.
+            val json = populated().export(includeHistory = false)
+            val target = Device()
+            target.articles.recordOpen("id9", "outlet9", listOf("world"), t - 1.hours)
+            val history = target.articles.listHistory()
+            target.restorer.restore(BackupCodec.import(json).getOrThrow()).getOrThrow()
+            assertEquals(history, target.articles.listHistory())
+        }
+
+    @Test
     fun badFilesReturnErrorsAndLeaveStateUnchanged() =
         runTest {
             val target = populated()
@@ -214,6 +229,19 @@ class BackupCodecTest {
             val result = target.restorer.restore(bad)
             assertTrue(result.isFailure)
             assertEquals(before, target.state())
+        }
+
+    @Test
+    fun aRestoreWhoseCallerIsCancelledStillFinishesWhole() =
+        runTest {
+            // B33: stopping between the tables and the preferences would leave a mix of both.
+            val source = populated()
+            val contents = BackupCodec.import(source.export(includeHistory = true)).getOrThrow()
+            val target = Device()
+            val job = launch(start = CoroutineStart.UNDISPATCHED) { target.restorer.restore(contents) }
+            job.cancel()
+            job.join()
+            assertEquals(source.state(), target.state())
         }
 
     @Test

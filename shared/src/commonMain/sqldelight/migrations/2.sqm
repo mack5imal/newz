@@ -1,0 +1,15 @@
+-- Version 2 -> 3. Existing rows are kept; nothing is dropped.
+--
+-- article_feed (B31): every feed an article was seen in. Each cached article starts with the one
+-- feed its row remembers, and later sightings add the others.
+CREATE TABLE article_feed (
+    articleId TEXT NOT NULL,
+    feedId TEXT NOT NULL,
+    topics TEXT NOT NULL,
+    PRIMARY KEY (articleId, feedId)
+);
+
+INSERT OR IGNORE INTO article_feed(articleId, feedId, topics) SELECT id, feedId, topics FROM article;
+
+-- history_openedAt (B34): history is now pruned by age.
+CREATE INDEX history_openedAt ON history(openedAt);

@@ -30,7 +30,8 @@ autonomous run, then polished through a couple of hours of hands-on testing and 
 - **Local news without location tracking.** Type a zip code once; it is matched to a metro area
   using a table that ships with the app and never leaves the device.
 - **Works offline.** Articles are cached on the phone, and saved articles stay readable.
-- **Your data stays yours.** Reading history is optional and on-device only. Settings, follows,
+- **Your data stays yours.** Reading history is optional, on-device only and forgotten after
+  180 days. Settings, follows,
   mutes and saved articles can be exported to a file and imported again.
 
 Articles open in your browser's in-app tab. Newz shows headlines and pictures from the feeds; it

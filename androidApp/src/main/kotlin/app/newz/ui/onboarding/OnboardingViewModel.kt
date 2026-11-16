@@ -30,6 +30,9 @@ class OnboardingViewModel(
     val topics: List<Topic> = graph.catalog.topics
     val zipResolver: ZipResolver = ZipResolver(graph.catalog)
 
+    /** True when onboarding is back because a damaged settings file was reset (B32). */
+    val settingsWereReset: Boolean get() = graph.preferencesStore.wasReset.value
+
     private val pickedState = MutableStateFlow<Set<String>>(emptySet())
     val picked: StateFlow<Set<String>> = pickedState.asStateFlow()
 

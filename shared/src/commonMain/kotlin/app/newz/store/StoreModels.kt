@@ -44,6 +44,12 @@ data class StoredArticle(
     val topics: List<String>,
 )
 
+/** One feed an article was seen in, with the topics that feed gives its articles (B31). */
+data class FeedSighting(
+    val feedId: String,
+    val topics: List<String>,
+)
+
 /** An article the user hid, with just enough to list it under "Hidden" and to undo it. */
 @Serializable
 data class HiddenArticle(

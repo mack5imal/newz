@@ -1,0 +1,18 @@
+-- Every feed an article was seen in, with that feed's topics (B31). One outlet's section feeds
+-- often carry the same story, which is one article row (its id hashes outlet and guid), so the
+-- article row alone remembers only the first feed. topics is a JSON string array.
+CREATE TABLE article_feed (
+    articleId TEXT NOT NULL,
+    feedId TEXT NOT NULL,
+    topics TEXT NOT NULL,
+    PRIMARY KEY (articleId, feedId)
+);
+
+upsert:
+INSERT OR REPLACE INTO article_feed(articleId, feedId, topics) VALUES (?, ?, ?);
+
+selectAll:
+SELECT * FROM article_feed ORDER BY articleId, feedId;
+
+pruneOrphans:
+DELETE FROM article_feed WHERE articleId NOT IN (SELECT id FROM article);

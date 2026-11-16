@@ -137,6 +137,15 @@ class ArticleStoreTest {
     }
 
     @Test
+    fun historyOlderThanTheRetentionIsPruned() {
+        // B34: history no longer grows for ever.
+        store.recordOpen("old", "outlet-1", emptyList(), now - ArticleStore.HISTORY_RETENTION - 1.minutes)
+        store.recordOpen("kept", "outlet-1", emptyList(), now - ArticleStore.HISTORY_RETENTION + 1.minutes)
+        store.pruneHistory(now)
+        assertEquals(listOf("kept"), store.listHistory().map { it.articleId })
+    }
+
+    @Test
     fun historyTableHasOnlyTheFourAllowedColumns() {
         val columns =
             driver

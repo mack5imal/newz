@@ -48,6 +48,9 @@ class ArticleStore(
             for (item in items) {
                 val id = ArticleIds.of(outletId, item.guid, item.url)
                 val publishedAt = item.publishedAt?.toEpochMilliseconds()
+                // Every sighting is kept, not just the first (B31): the same story in two of an
+                // outlet's sections is one row, and unfollowing one section must not hide it.
+                db.articleFeedQueries.upsert(id, feedId, topicsText)
                 val existing = db.articleQueries.selectById(id).executeAsOneOrNull()
                 if (existing == null) {
                     db.articleQueries.insertIfAbsent(
@@ -86,12 +89,25 @@ class ArticleStore(
             .executeAsList()
             .map { it.toModel() }
 
+    /**
+     * Every feed each cached article was seen in, with that feed's topics, by article id (B31).
+     * The article row's own feed is always among them.
+     */
+    fun articleSightings(): Map<String, List<FeedSighting>> =
+        db.articleFeedQueries
+            .selectAll()
+            .executeAsList()
+            .groupBy({ it.articleId }) { FeedSighting(it.feedId, decodeTopics(it.topics)) }
+
     /** Drops cached articles published before `now - age`. Saved articles are never dropped. */
     fun pruneOlderThan(
         age: Duration,
         now: Instant = Clock.System.now(),
     ) {
-        db.articleQueries.pruneBefore((now - age).toEpochMilliseconds())
+        db.transaction {
+            db.articleQueries.pruneBefore((now - age).toEpochMilliseconds())
+            db.articleFeedQueries.pruneOrphans()
+        }
     }
 
     // Hidden
@@ -187,6 +203,14 @@ class ArticleStore(
         db.historyQueries.deleteAll()
     }
 
+    /**
+     * Forgets opens older than [HISTORY_RETENTION] (B34). Without it the table only grows, and
+     * every feed compose reads all of it for reading affinity.
+     */
+    fun pruneHistory(now: Instant = Clock.System.now()) {
+        db.historyQueries.pruneBefore((now - HISTORY_RETENTION).toEpochMilliseconds())
+    }
+
     // Feed status
 
     fun markFeedOk(
@@ -274,19 +298,21 @@ class ArticleStore(
 
     /**
      * Replaces the hidden, saved, custom-feed and history tables with the given rows in one
-     * transaction (backup restore). Any failure, such as a duplicate id, rolls all of it back.
+     * transaction (backup restore). A null [history] leaves the history table as it is: a backup
+     * exported without history says nothing about it (B29). Any failure, such as a duplicate id,
+     * rolls all of it back.
      */
     fun replaceUserData(
         hidden: List<HiddenArticle>,
         saved: List<SavedArticle>,
         customFeeds: List<CustomFeed>,
-        history: List<HistoryEntry>,
+        history: List<HistoryEntry>?,
     ) {
         db.transaction {
             db.hiddenQueries.deleteAll()
             db.savedQueries.deleteAll()
             db.customFeedQueries.deleteAll()
-            db.historyQueries.deleteAll()
+            if (history != null) db.historyQueries.deleteAll()
             for (h in hidden) {
                 db.hiddenQueries.insert(h.articleId, h.hiddenAt.toEpochMilliseconds(), h.title, h.outletId, h.url)
             }
@@ -311,7 +337,7 @@ class ArticleStore(
             for (f in customFeeds) {
                 db.customFeedQueries.insert(f.id, f.url, f.title, f.siteUrl, f.kind, f.addedAt.toEpochMilliseconds())
             }
-            for (e in history) {
+            for (e in history.orEmpty()) {
                 val openedAt = e.openedAt.toEpochMilliseconds()
                 db.historyQueries.insert(e.articleId, e.outletId, encodeTopics(e.topics), openedAt)
             }
@@ -330,6 +356,9 @@ class ArticleStore(
          * read twice, and long enough to spot an outlet's logo standing in for its pictures.
          */
         val PAGE_IMAGE_RETENTION: Duration = 30.days
+
+        /** How long reading history is kept: long enough for affinity to reflect habits, not forever. */
+        val HISTORY_RETENTION: Duration = 180.days
 
         private val topicsSerializer = ListSerializer(String.serializer())
 

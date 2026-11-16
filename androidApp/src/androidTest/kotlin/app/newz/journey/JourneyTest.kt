@@ -143,6 +143,9 @@ class JourneyTest {
         open("Backup & restore", Screen.Backup)
         stubPickers(file)
         tap("Choose a backup file")
+        // B29: a restore asks before it replaces anything.
+        compose.waitForText("Replace this phone’s choices?", TIMEOUT)
+        compose.onNode(hasText("Replace") and hasClickAction()).performClick()
         compose.waitForText("Backup imported", TIMEOUT)
         assertEquals(chosen, currentPrefs())
 
