@@ -57,6 +57,8 @@ object AddressInput {
         val port = if (':' in authority) authority.substringAfterLast(':') else null
         if (port != null && !PORT.matches(port)) return Input.NotAnAddress
         val host = asciiHost(rawHost) ?: return Input.NotAnAddress
+        // HostGuard refuses IP addresses (B26); saying "not an address" beats the Google refusal.
+        if (HostGuard.isRefusedAddress(host)) return Input.NotAnAddress
         val portPart = port?.let { ":$it" }.orEmpty()
         return Input.WebAddress("$scheme://$host$portPart$tail", host)
     }

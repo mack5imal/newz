@@ -71,8 +71,20 @@ private val REDIRECT_STATUSES =
         HttpStatusCode.PermanentRedirect,
     )
 
+/**
+ * The most a picture download may read (B27). Feeds and pages are capped by [fetchCapped], but
+ * Coil streams image bodies itself, so the cap for pictures lives in the engine.
+ */
+const val MAX_IMAGE_BYTES = 10_000_000L
+
 /** The platform's engine with redirects and cookies turned off (Ktor follows redirects itself). */
 internal expect fun platformHttpEngine(): HttpClientEngine
+
+/** [platformHttpEngine] that also fails any response body longer than [maxBodyBytes]. */
+internal expect fun platformImageEngine(maxBodyBytes: Long): HttpClientEngine
+
+/** The client for picture downloads: [newzHttpClient] with bodies capped at [MAX_IMAGE_BYTES]. */
+fun newzImageHttpClient(): HttpClient = newzHttpClient(platformImageEngine(MAX_IMAGE_BYTES))
 
 /**
  * The one HTTP client Newz uses. Fixed User-Agent, gzip/deflate, 15 s request / 10 s connect

@@ -40,6 +40,35 @@ object HostGuard {
             "firebaseio.com",
             "firebaseapp.com",
             "app.goo.gl",
+            // Ad, analytics and tag hosts that feed images and links point at (B24).
+            "2mdn.net",
+            "doubleclick.com",
+            "googleadservices.com",
+            "googletagservices.com",
+            "app-measurement.com",
+            "admob.com",
+            // Blogger's image host, Google-hosted custom domains and Google's own network.
+            "blogblog.com",
+            "googlehosted.com",
+            "1e100.net",
+            "gvt1.com",
+            "gvt2.com",
+            "gvt3.com",
+            // Firebase hosting, dynamic links and storage.
+            "page.link",
+            "web.app",
+            "firebasestorage.app",
+            // Mirrors of Google services under other names.
+            "recaptcha.net",
+            "gstatic.cn",
+            "googleapis.cn",
+            "googleusercontent.cn",
+            // The AMP cache is served by Google.
+            "cdn.ampproject.org",
+            "ampproject.net",
+            "gmail.com",
+            "googlemail.com",
+            "youtubekids.com",
         )
 
     /** Second-level labels that sit between `google` and a country code, as in google.co.uk. */
@@ -52,9 +81,52 @@ object HostGuard {
         return isBlockedHost(host)
     }
 
-    /** True when [host] is Google-owned. Case-insensitive, ignores a trailing dot, IDN-aware. */
+    /**
+     * True when [host] is Google-owned. Case-insensitive, ignores a trailing dot, IDN-aware.
+     *
+     * The host is judged twice: in HostGuard's own normalised form, and in the form the HTTP
+     * engine will really connect to ([engineCanonicalHost]). OkHttp applies full UTS-46 mapping,
+     * so `ⓖoogle.com` or `goo<soft hyphen>gle.com` reach google.com even though they look like
+     * other names here (B23). A host is blocked when either form is Google's or either cannot be
+     * read.
+     */
     fun isBlockedHost(host: String): Boolean {
-        val normalized = normalizeHost(host) ?: return true
+        // OkHttp reports an IPv6 host without its brackets; put them back so it parses here.
+        val bracketed = if (':' in host && !host.startsWith("[")) "[$host]" else host
+        val own = normalizeHost(bracketed) ?: return true
+        val engineHost = engineCanonicalHost(bracketed) ?: return true
+        val engine =
+            normalizeHost(if (':' in engineHost && !engineHost.startsWith("[")) "[$engineHost]" else engineHost)
+                ?: return true
+        if (isRefusedIpLiteral(own) || isRefusedIpLiteral(engine)) return true
+        return isGoogleHost(own) || isGoogleHost(engine)
+    }
+
+    /**
+     * True for an IP-address host other than loopback (B26). A name check cannot tell a Google
+     * address (142.250.80.46) from any other, and a literal lets a feed make the phone open a
+     * connection to an address it chose, LAN addresses included. Loopback never leaves the
+     * phone, and the UI tests' feed server listens on 127.0.0.1.
+     *
+     * A host whose last label is numeric counts as an address in any spelling: the resolvers
+     * also read `2130706433` or `0x7f.1` as addresses, and no real top-level domain is numeric.
+     */
+    internal fun isRefusedAddress(host: String): Boolean {
+        val bracketed = if (':' in host && !host.startsWith("[")) "[$host]" else host
+        return isRefusedIpLiteral(normalizeHost(bracketed) ?: return false)
+    }
+
+    private fun isRefusedIpLiteral(normalized: String): Boolean {
+        if (normalized.startsWith("[")) return normalized != "[::1]"
+        val last = normalized.substringAfterLast('.')
+        val numeric = last.isNotEmpty() && (last.all { it.isDigit() } || last.startsWith("0x"))
+        if (!numeric) return false
+        return !LOOPBACK_V4.matches(normalized)
+    }
+
+    private val LOOPBACK_V4 = Regex("127\\.(25[0-5]|2[0-4]\\d|1?\\d?\\d)(\\.(25[0-5]|2[0-4]\\d|1?\\d?\\d)){2}")
+
+    private fun isGoogleHost(normalized: String): Boolean {
         if (normalized.isEmpty()) return true
         if (GOOGLE_HOSTS.any { normalized == it || normalized.endsWith(".$it") }) return true
         return isGoogleTldHost(normalized)
@@ -62,12 +134,24 @@ object HostGuard {
 
     /**
      * Lower-cases [host], drops a trailing dot and converts each non-ASCII label to its
-     * punycode (`xn--`) form. Fullwidth ASCII and ideographic full stops are mapped to their
-     * ASCII forms first, as IDNA mapping does. Returns null when the host cannot be encoded.
+     * punycode (`xn--`) form. Existing `xn--` labels are decoded first, because the engine
+     * decodes them too (`xn--google-` is `google`). Fullwidth ASCII and ideographic full stops
+     * are mapped to their ASCII forms, as IDNA mapping does. Returns null when the host cannot
+     * be decoded or encoded.
      */
     internal fun normalizeHost(host: String): String? {
-        val decoded = percentDecode(host.trim()) ?: return null
-        if (!isValidHostSyntax(decoded)) return null
+        val percentDecoded = percentDecode(host.trim()) ?: return null
+        if (!isValidHostSyntax(percentDecoded)) return null
+        val decoded =
+            percentDecoded
+                .split('.')
+                .map { label ->
+                    if (label.startsWith("xn--", ignoreCase = true)) {
+                        Punycode.decode(label.substring(4)) ?: return null
+                    } else {
+                        label
+                    }
+                }.joinToString(".")
         val mapped =
             buildString {
                 for (c in decoded) {
@@ -166,7 +250,13 @@ object HostGuard {
     }
 }
 
-/** RFC 3492 punycode encoder, used to compare IDN hosts in their ASCII form. */
+/**
+ * [host] as the platform's HTTP engine will connect to it, or null when the engine rejects it.
+ * On JVM and Android this is OkHttp's own canonical form (B23).
+ */
+internal expect fun engineCanonicalHost(host: String): String?
+
+/** RFC 3492 punycode encoder and decoder, used to compare IDN hosts in their ASCII form. */
 internal object Punycode {
     private const val BASE = 36
     private const val T_MIN = 1
@@ -233,6 +323,70 @@ internal object Punycode {
         }
         return (k + (BASE - T_MIN + 1) * d / (d + SKEW)).toInt()
     }
+
+    /**
+     * Decodes the part of an `xn--` label after the prefix, or returns null when it is not
+     * valid punycode. HostGuard needs this because the engine decodes `xn--google-` to `google`
+     * before it connects (B23).
+     */
+    fun decode(input: String): String? {
+        val delimiter = input.lastIndexOf('-').coerceAtLeast(0)
+        val output = ArrayList<Int>(input.length)
+        for (c in input.substring(0, delimiter)) {
+            if (c.code >= 0x80) return null
+            output.add(c.code)
+        }
+        var n = INITIAL_N.toLong()
+        var i = 0L
+        var bias = INITIAL_BIAS
+        var pos = if (delimiter > 0) delimiter + 1 else 0
+        while (pos < input.length) {
+            val oldI = i
+            var w = 1L
+            var k = BASE
+            while (true) {
+                if (pos >= input.length) return null
+                val d = digitValue(input[pos++]) ?: return null
+                i += d * w
+                if (i > MAX_CODE_POINT * (output.size + 1L)) return null
+                val t =
+                    when {
+                        k <= bias -> T_MIN
+                        k >= bias + T_MAX -> T_MAX
+                        else -> k - bias
+                    }
+                if (d < t) break
+                w *= BASE - t
+                k += BASE
+            }
+            bias = adapt(i - oldI, output.size + 1, oldI == 0L)
+            n += i / (output.size + 1)
+            if (n > MAX_CODE_POINT || n in 0xD800L..0xDFFFL) return null
+            i %= (output.size + 1)
+            output.add(i.toInt(), n.toInt())
+            i++
+        }
+        return buildString {
+            for (cp in output) {
+                if (cp < 0x10000) {
+                    append(cp.toChar())
+                } else {
+                    append((0xD800 + ((cp - 0x10000) shr 10)).toChar())
+                    append((0xDC00 + ((cp - 0x10000) and 0x3FF)).toChar())
+                }
+            }
+        }
+    }
+
+    private const val MAX_CODE_POINT = 0x10FFFFL
+
+    private fun digitValue(c: Char): Long? =
+        when (c) {
+            in 'a'..'z' -> (c - 'a').toLong()
+            in 'A'..'Z' -> (c - 'A').toLong()
+            in '0'..'9' -> (c - '0' + 26).toLong()
+            else -> null
+        }
 
     private fun digit(d: Int): Char = if (d < 26) 'a' + d else '0' + (d - 26)
 

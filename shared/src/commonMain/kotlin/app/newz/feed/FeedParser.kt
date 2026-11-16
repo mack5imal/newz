@@ -114,7 +114,9 @@ object FeedParser {
 
     private fun toItem(item: RssItem): ParsedItem? {
         // Only http(s) links are kept: a `javascript:`, `intent:` or `file:` link is never stored.
-        val url = item.link?.trim()?.takeIf(WebUrl::isWebUrl) ?: return null
+        // A link to a Google host is dropped too (B25): opening it would tell Google, through
+        // FeedBurner's redirect or YouTube, which article the user read.
+        val url = item.link?.trim()?.takeIf { WebUrl.isWebUrl(it) && !HostGuard.isBlocked(it) } ?: return null
         val title = HtmlText.toPlainText(item.title.orEmpty())
         if (title.isEmpty()) return null
         val body = item.description ?: item.content

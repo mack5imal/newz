@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import app.newz.net.HostGuard
 import app.newz.net.newzHttpClient
+import app.newz.net.newzImageHttpClient
 import coil3.ImageLoader
 import coil3.annotation.ExperimentalCoilApi
 import coil3.disk.DiskCache
@@ -39,11 +40,14 @@ object NewzImageLoader {
             instance ?: create(context.applicationContext).also { instance = it }
         }
 
-    /** A new loader over [httpClient]; tests pass a client built on a fake engine. */
+    /**
+     * A new loader over [httpClient]; tests pass a client built on a fake engine. The default
+     * client caps each picture at MAX_IMAGE_BYTES (B27), since Coil streams the body itself.
+     */
     @OptIn(ExperimentalCoilApi::class)
     fun create(
         context: Context,
-        httpClient: HttpClient = newzHttpClient(),
+        httpClient: HttpClient = newzImageHttpClient(),
     ): ImageLoader =
         ImageLoader
             .Builder(context)

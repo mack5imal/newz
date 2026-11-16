@@ -44,7 +44,9 @@ relying on good intentions:
 - Every network request goes through one gate, [`HostGuard`](shared/src/commonMain/kotlin/app/newz/net/HostGuard.kt),
   which refuses any Google-owned host (google.\*, gstatic, googleapis, YouTube, Blogger,
   FeedBurner, DoubleClick, Firebase and more). Feeds, pictures and discovered sites are all
-  checked, including after redirects.
+  checked, including after redirects. The HTTP engine checks again, on the host name exactly as
+  it will connect to it, so disguised spellings (punycode, lookalike Unicode letters, invisible
+  characters) cannot slip through.
 - No Google Play Services, Firebase, analytics, crash reporting or ad libraries. The release
   check script fails the build if any of them appear in the dependency tree.
 - The app asks for two permissions only: internet access and network status.

@@ -2,7 +2,8 @@
 
 Bugs and errors found while testing Newz on the emulator (`newz-api34`), started 2026-10-17.
 Each entry is numbered and keeps its number for good. When the fix plan is made, entries move
-from **Open** to **Fixed** with the commit that fixed them.
+from **Open** to **Fixed** with the commit that fixed them. Entries B23 onwards come from the
+November 2026 code review (`reviews/2026-11-code-review.md`); each names its review ID.
 
 Severity: **High** blocks testing or loses data · **Medium** wrong behavior with a workaround ·
 **Low** cosmetic.
@@ -10,6 +11,51 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 ## Open
 
 ## Fixed
+
+### B23 — HostGuard and OkHttp read hosts differently, so disguised Google hosts get through (R1)
+- **Severity:** High (breaks the no-Google promise)
+- **Where:** `shared/src/commonMain/kotlin/app/newz/net/HostGuard.kt` (`normalizeHost`),
+  `Engine.android.kt`, `Engine.jvm.kt`
+- **Seen:** in review. `xn--google-.com`, `ⓖoogle.com`, a soft hyphen or zero-width space inside
+  `google`, and `blogſpot.com` all pass `isBlocked`, but OkHttp's UTS-46 mapping turns them into
+  the real Google host and connects.
+- **Cause:** HostGuard maps only fullwidth ASCII and never decodes existing `xn--` labels; the
+  engine applies full IDNA mapping after the check.
+- **Fixed in:** `8cecf94` (HostGuard decodes punycode and also judges OkHttp's own canonical host; the OkHttp engine, now one file for jvm and android, checks every hop in interceptors and DNS).
+
+### B24 — Blocked-host list misses Google ad, analytics, Blogger, Firebase and AMP domains (R2)
+- **Severity:** Medium
+- **Where:** `HostGuard.kt` (`GOOGLE_HOSTS`)
+- **Seen:** in review. 2mdn.net, googleadservices.com, app-measurement.com, blogblog.com,
+  web.app, page.link, cdn.ampproject.org and others are not blocked.
+- **Fixed in:** `795a1de` (22 more Google domains blocked).
+
+### B25 — Feed items that link to Google hosts are kept and open in the browser (R3)
+- **Severity:** Medium
+- **Where:** `shared/src/commonMain/kotlin/app/newz/feed/FeedParser.kt` (`toItem`),
+  `androidApp/.../platform/ArticleOpener.kt`, `ShareLauncher.kt`
+- **Seen:** in review. A `feedproxy.google.com` item link shows as a normal card and tapping it
+  opens Google.
+- **Fixed in:** `f0a5928` (the parser drops items whose link is blocked; ArticleOpener and ShareLauncher refuse blocked hosts too).
+
+### B26 — IP-literal hosts pass HostGuard (R14)
+- **Severity:** Low
+- **Where:** `HostGuard.kt` (`isBlockedHost`)
+- **Seen:** in review. `https://142.250.80.46/x.jpg` and `https://[::ffff:8.8.8.8]/` are fetched.
+- **Fixed in:** `3890527` (IP-address hosts are refused, loopback aside; a typed IP is "not an address").
+
+### B27 — Image downloads have no size cap (R16)
+- **Severity:** Low
+- **Where:** `androidApp/src/main/kotlin/app/newz/ui/image/NewzImageLoader.kt`
+- **Seen:** in review. A feed naming a 300 MB image makes each card download for up to 15 s.
+- **Fixed in:** `e2ec90d` (the image client's engine fails a body past 10 MB, declared or not).
+
+### B28 — Autodiscovery stops at a Google feed even when the site declares its own (R17)
+- **Severity:** Low
+- **Where:** `shared/src/commonMain/kotlin/app/newz/discover/FeedDiscovery.kt` (`feedLink`)
+- **Seen:** in review. A site that lists feeds.feedburner.com first and `/feed/` second shows the
+  Google refusal.
+- **Fixed in:** `3143d07` (every declared feed is tried; Google is refused only when all are Google's).
 
 ### B22 — After a refresh, old articles sit at the top; new ones are scattered down the feed
 - **Severity:** Medium

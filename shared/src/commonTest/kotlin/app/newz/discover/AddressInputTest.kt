@@ -44,7 +44,14 @@ class AddressInputTest {
             web("https://localhost.example:8443/a", "localhost.example"),
             AddressInput.classify("https://localhost.example:8443/a"),
         )
-        assertEquals(web("https://192.168.1.10", "192.168.1.10"), AddressInput.classify("192.168.1.10"))
+        // B26: IP addresses are refused (loopback aside), so a typed one is not an address
+        // rather than being reported as a Google host.
+        assertEquals(Input.NotAnAddress, AddressInput.classify("192.168.1.10"))
+        assertEquals(Input.NotAnAddress, AddressInput.classify("https://[2001:db8::1]/feed"))
+        assertEquals(
+            web("http://127.0.0.1:8080/feed", "127.0.0.1"),
+            AddressInput.classify("http://127.0.0.1:8080/feed"),
+        )
         assertEquals(web("https://site.example/feed", "site.example"), AddressInput.classify("site.example/feed#top"))
     }
 
