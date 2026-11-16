@@ -46,9 +46,6 @@ sealed interface BackupNote {
 class BackupViewModel(
     private val graph: AppGraph,
 ) : ViewModel() {
-    private val includeHistoryState = MutableStateFlow(false)
-    val includeHistory: StateFlow<Boolean> = includeHistoryState.asStateFlow()
-
     private val noteState = MutableStateFlow<BackupNote?>(null)
     val note: StateFlow<BackupNote?> = noteState.asStateFlow()
 
@@ -57,23 +54,23 @@ class BackupViewModel(
     /** A checked backup waiting for the user to confirm the restore; null when none is. */
     val pendingImport: StateFlow<PendingImport?> = pendingState.asStateFlow()
 
-    fun setIncludeHistory(on: Boolean) {
-        includeHistoryState.value = on
-    }
-
     /** `newz-backup-{yyyy-mm-dd}.json`, dated today in the phone's time zone. */
     fun suggestedFileName(): String {
         val day = graph.clock().toJavaInstant().atZone(ZoneId.systemDefault())
         return "newz-backup-${DateTimeFormatter.ISO_LOCAL_DATE.format(day)}.json"
     }
 
-    /** Writes the backup to [uri], the document the system picker created. */
+    /**
+     * Writes the backup to [uri], the document the system picker created. [withHistory] comes
+     * from the screen's saved state, not from here (B49): the picker's result can reach a new
+     * view model after Android killed the app while the user browsed folders.
+     */
     fun export(
         resolver: ContentResolver,
         uri: Uri,
         suggestedName: String,
+        withHistory: Boolean,
     ) {
-        val withHistory = includeHistoryState.value
         viewModelScope.launch {
             val prefs = graph.preferencesStore.prefs.first()
             val written =

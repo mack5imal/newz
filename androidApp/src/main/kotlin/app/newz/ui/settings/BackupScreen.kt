@@ -45,14 +45,15 @@ fun BackupScreen(
     viewModel: BackupViewModel,
     onBack: () -> Unit,
 ) {
-    val includeHistory by viewModel.includeHistory.collectAsState()
+    // Saveable, so the choice survives the app being killed while the file picker is open (B49).
+    var includeHistory by rememberSaveable { mutableStateOf(false) }
     val note by viewModel.note.collectAsState()
     val pendingImport by viewModel.pendingImport.collectAsState()
     val resolver = LocalContext.current.applicationContext.contentResolver
     var exportName by rememberSaveable { mutableStateOf("") }
     val exporter =
         rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-            if (uri != null) viewModel.export(resolver, uri, exportName)
+            if (uri != null) viewModel.export(resolver, uri, exportName, includeHistory)
         }
     val importer =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -68,7 +69,7 @@ fun BackupScreen(
         Panel(title = "Export") {
             Checkbox(
                 checked = includeHistory,
-                onCheckedChange = viewModel::setIncludeHistory,
+                onCheckedChange = { includeHistory = it },
                 label = "Include reading history",
                 subtitle = "Left out unless you tick it",
                 modifier = Modifier.padding(horizontal = NewzTokens.spaceL, vertical = NewzTokens.spaceS),
