@@ -39,6 +39,17 @@ class KeywordMatcherTest {
             Case("Łódź", "Lodz council", true),
             Case("5G", "New 5G towers", true),
             Case("Musk", "Elon Musk's company", true),
+            // B43: "es" is an ending only where English adds it (after s, x, z, ch, sh, o).
+            Case("Tim", "Times Square reopens", false),
+            Case("Tim", "three times over", false),
+            Case("rat", "Bank raises rates", false),
+            Case("US", "Who uses it", false),
+            Case("cop", "She copes well", false),
+            Case("bus", "New buses arrive", true),
+            Case("church", "Churches close", true),
+            Case("wish", "Best wishes", true),
+            Case("tomato", "Tomatoes recalled", true),
+            Case("blitz", "Blitzes on the coast", true),
         )
 
     @Test
