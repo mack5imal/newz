@@ -9,6 +9,7 @@ import app.newz.store.UserPrefs
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
@@ -48,12 +49,19 @@ sealed interface FeedState {
         val firstLoad: Boolean,
     ) : FeedState
 
-    /** [cards] served so far; [failingFeeds] are the ids of followed feeds currently failing. */
+    /**
+     * [cards] served so far; [failingFeeds] are the ids of followed feeds currently failing.
+     * [newStories] counts the story groups (over the whole feed, before the screen's topic
+     * filter) holding an article that was not in the store at the last re-rank: a load over
+     * shown cards merges them behind the served ones, and [FeedRepository.showNewStories]
+     * brings them to the top (B22).
+     */
     data class Content(
         val cards: List<FeedCard>,
         val endReached: Boolean,
         val offline: Boolean,
         val failingFeeds: Set<String>,
+        val newStories: Int = 0,
     ) : FeedState
 
     data class Empty(
@@ -67,7 +75,9 @@ sealed interface FeedState {
  *
  * Collecting [feed] the first time shows cached eligible cards at once (cache-first), then starts
  * a refresh. Cards appear as soon as the first feed lands when nothing was shown yet; a finished
- * load merges into the served cards without moving or duplicating them. Preferences and the
+ * load merges into the served cards without moving or duplicating them and counts the stories it
+ * brought ([FeedState.Content.newStories]), unless it was a pull to refresh (`refresh(rerank =
+ * true)`), which re-ranks from the top (B22). Preferences and the
  * hidden/saved/history tables are re-read at every composition. A preference change recomposes
  * from the cache at once; store-side changes do so through [invalidate].
  *
@@ -97,6 +107,15 @@ class FeedRepository(
      * load: landed feeds then merge into the served cards instead of re-ranking them. Guarded by [lock].
      */
     private var userMoved = false
+
+    /** True once a pull to refresh asked the running or next load to re-rank. Guarded by [lock]. */
+    private var rerankRequested = false
+
+    /** Article ids in the snapshot of the last re-ranking publish; newer ones are new stories. Guarded by [lock]. */
+    private var baselineIds: Set<String> = emptySet()
+
+    /** [FeedState.Content.newStories] of the last publish. Guarded by [lock]. */
+    private var newStories = 0
     private val lock = Mutex()
     private val pager = FeedPager(pageSize)
     private var loadedOnce = false
@@ -150,11 +169,27 @@ class FeedRepository(
             emitAll(state)
         }
 
-    /** Reloads every followed feed; joins a load already running. */
-    fun refresh(): Job {
+    /**
+     * Reloads every followed feed; joins a load already running. With [rerank] (a pull to
+     * refresh) the load re-ranks the feed from the top when it lands, even one already running;
+     * otherwise it merges behind the served cards.
+     */
+    fun refresh(rerank: Boolean = false): Job {
         state.value.let { if (it is FeedState.Empty) state.value = FeedState.Loading(firstLoad = !loadedOnce) }
-        return coordinator.refresh()
+        if (!rerank) return coordinator.refresh()
+        // Undispatched: the flag is set and the load started or joined before this returns
+        // unless the lock is held, in which case it follows as soon as the lock is free.
+        return scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            lock.withLock { rerankRequested = true }
+            coordinator.refresh().join()
+        }
     }
+
+    /** Re-ranks the feed from the cache so the [FeedState.Content.newStories] come first. */
+    fun showNewStories(): Job =
+        scope.launch {
+            publish(readSnapshot(), reset = true, loading = coordinator.isRunning.value)
+        }
 
     /** Re-fetches the one followed feed [feedId] (Retry on a failing feed); joins a load already running. */
     fun retryFeed(feedId: String): Job = coordinator.retry(feedId)
@@ -241,10 +276,17 @@ class FeedRepository(
 
     private suspend fun onLoaded(result: LoadResult) {
         loadedOnce = true
-        lock.withLock { growing = false }
         offline = result.offline
         failing = result.failingFeeds
-        publish(result.snapshot, reset = state.value !is FeedState.Content, loading = false)
+        // A load that grew the feed from nothing ends re-ranked like its growing publishes unless
+        // the user moved meanwhile, so feeds landing after the last of those are not "new stories".
+        val reset =
+            lock.withLock {
+                val grew = growing && !userMoved
+                growing = false
+                (state.value !is FeedState.Content || rerankRequested || grew).also { rerankRequested = false }
+            }
+        publish(result.snapshot, reset = reset, loading = false)
     }
 
     private suspend fun publish(
@@ -258,7 +300,14 @@ class FeedRepository(
         lock.withLock {
             if (whileGrowing && !growing) return
             val rerank = if (whileGrowing) reset && !userMoved else reset
-            if (rerank) pager.reset(groups) else pager.submit(groups)
+            if (rerank) {
+                pager.reset(groups)
+                baselineIds = snapshot.articles.mapTo(HashSet()) { it.id }
+                newStories = 0
+            } else {
+                pager.submit(groups)
+                newStories = groups.count { g -> g.members().any { it.id !in baselineIds } }
+            }
             if (pager.servedGroups.size < pager.pageSize) pager.page(0)
             savedIds = snapshot.savedIds
             composedPrefs = snapshot.prefs
@@ -284,6 +333,7 @@ class FeedRepository(
             endReached = pager.endReached,
             offline = offline,
             failingFeeds = failing,
+            newStories = newStories,
         )
 
     companion object {

@@ -102,7 +102,90 @@ class FeedRepositoryTest {
             val after = assertIs<FeedState.Content>(repo.feed.first())
             assertEquals(3, after.cards.size)
             assertEquals(first.cards, after.cards.take(2))
+            assertEquals(0, first.newStories)
+            assertEquals(1, after.newStories)
             assertEquals(1, h.requestsTo("a"))
+        }
+
+    private fun FeedState.Content.leadUrls() = cards.map { it.group.lead.url }
+
+    /** B22: a pull to refresh re-ranks from the top, so the newest story leads. */
+    @Test
+    fun pullRefreshReranksNewestFirst() =
+        runTest {
+            val h = EngineHarness()
+            h.cache("a", 2)
+            h.items["b"] = listOf(TestItem("fresh", EngineHarness.uniqueTitle(500), age = 0.hours))
+            val repo = h.repository(backgroundScope)
+            repo.feed.first()
+            repo.refresh().join()
+            val merged = assertIs<FeedState.Content>(repo.feed.first())
+            assertEquals("https://news.example/fresh", merged.leadUrls().last())
+            repo.refresh(rerank = true).join()
+            val pulled = assertIs<FeedState.Content>(repo.feed.first())
+            assertEquals("https://news.example/fresh", pulled.leadUrls().first())
+            assertEquals(merged.leadUrls().toSet(), pulled.leadUrls().toSet())
+            assertEquals(0, pulled.newStories)
+            assertEquals(2, h.requestsTo("b"))
+        }
+
+    @Test
+    fun showNewStoriesReranksAndClearsTheCount() =
+        runTest {
+            val h = EngineHarness()
+            h.cache("a", 2)
+            h.items["b"] = listOf(TestItem("fresh", EngineHarness.uniqueTitle(500), age = 0.hours))
+            val repo = h.repository(backgroundScope)
+            val first = assertIs<FeedState.Content>(repo.feed.first())
+            repo.refresh().join()
+            val merged = assertIs<FeedState.Content>(repo.feed.first())
+            assertEquals(1, merged.newStories)
+            assertEquals(first.leadUrls(), merged.leadUrls().take(2))
+            repo.showNewStories().join()
+            val shown = assertIs<FeedState.Content>(repo.feed.first())
+            assertEquals("https://news.example/fresh", shown.leadUrls().first())
+            assertEquals(0, shown.newStories)
+            assertEquals(1, h.requestsTo("b"))
+        }
+
+    /** A feed landing after the growing publishes is ranked in, not counted as a new story. */
+    @Test
+    fun aGrowingFirstLoadEndsRerankedWithNoNewStories() =
+        runTest {
+            val h = EngineHarness()
+            h.items["a"] = listOf(TestItem("a1", EngineHarness.uniqueTitle(1), age = 1.hours))
+            h.items["b"] = listOf(TestItem("b1", EngineHarness.uniqueTitle(2), age = 2.hours))
+            h.items["c"] = listOf(TestItem("late", EngineHarness.uniqueTitle(3), age = 0.hours))
+            val slowC = CompletableDeferred<Unit>()
+            h.feedGates["c"] = slowC
+            val repo = h.repository(backgroundScope)
+            repo.feed.first { it is FeedState.Content }
+            slowC.complete(Unit)
+            repo.refresh().join()
+            val done = assertIs<FeedState.Content>(repo.feed.first())
+            assertEquals("https://news.example/late", done.leadUrls().first())
+            assertEquals(3, done.cards.size)
+            assertEquals(0, done.newStories)
+        }
+
+    @Test
+    fun aPullJoiningARunningLoadStillReranks() =
+        runTest {
+            val h = EngineHarness()
+            h.cache("a", 2)
+            h.items["b"] = listOf(TestItem("fresh", EngineHarness.uniqueTitle(500), age = 0.hours))
+            val gate = CompletableDeferred<Unit>()
+            h.gate = gate
+            val repo = h.repository(backgroundScope)
+            assertIs<FeedState.Content>(repo.feed.first())
+            assertTrue(repo.isLoading.value)
+            val pull = repo.refresh(rerank = true)
+            gate.complete(Unit)
+            pull.join()
+            val pulled = assertIs<FeedState.Content>(repo.feed.first())
+            assertEquals("https://news.example/fresh", pulled.leadUrls().first())
+            assertEquals(0, pulled.newStories)
+            assertEquals(1, h.requestsTo("b"))
         }
 
     @Test
