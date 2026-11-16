@@ -56,7 +56,7 @@ object FeedParser {
         val xml = prepareXml(decode(bytes, contentTypeCharset))
         // A DOCTYPE the pattern could not remove whole leaves a declaration behind: refuse the feed
         // rather than let any parser see an entity definition (no XXE, no entity expansion).
-        if (DECLARATION.containsMatchIn(xml)) throw FeedParseException("Feed declares a DTD or entities")
+        if (declaresEntities(xml)) throw FeedParseException("Feed declares a DTD or entities")
         val kind = detectKind(xml) ?: throw FeedParseException("Not an RSS, Atom or RDF document")
         val channel =
             try {
@@ -99,6 +99,32 @@ object FeedParser {
                 else -> "utf-8"
             }
         return Charsets.decode(bytes, label)
+    }
+
+    /**
+     * True when `<!DOCTYPE` or `<!ENTITY` appears as markup, that is outside comments and CDATA
+     * sections (B44). Quoted inside CDATA it is only text, as in a post about XXE, and refusing
+     * it would reject the whole feed. An unterminated comment or CDATA section is not trusted to
+     * hide anything: the rest of the document is checked as it is.
+     */
+    internal fun declaresEntities(xml: String): Boolean {
+        var i = 0
+        while (true) {
+            val lt = xml.indexOf('<', i)
+            if (lt < 0) return false
+            val skipTo =
+                when {
+                    xml.startsWith("<!--", lt) -> xml.indexOf("-->", lt + 4).let { if (it < 0) -1 else it + 3 }
+                    xml.startsWith("<![CDATA[", lt) -> xml.indexOf("]]>", lt + 9).let { if (it < 0) -1 else it + 3 }
+                    else -> null
+                }
+            when {
+                skipTo == -1 -> return DECLARATION.containsMatchIn(xml.substring(lt + 1))
+                skipTo != null -> i = skipTo
+                DECLARATION.matchAt(xml, lt) != null -> return true
+                else -> i = lt + 1
+            }
+        }
     }
 
     /** The text is already decoded, so the prolog's encoding must not be applied a second time. */
