@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -169,9 +170,11 @@ fun FeedScreen(
     val refreshing by viewModel.refreshing.collectAsState()
     val busy by viewModel.busy.collectAsState()
     val message by viewModel.message.collectAsState()
-    var openGroup by remember { mutableStateOf<StoryGroup?>(null) }
-    var menuCardId by remember { mutableStateOf<String?>(null) }
-    var muteHeadline by remember { mutableStateOf<String?>(null) }
+    // Saveable, so an open sheet survives rotation, a theme or text-size change and process
+    // death (B54). The story group is kept by its lead's id and looked up again.
+    var openGroupLeadId by rememberSaveable { mutableStateOf<String?>(null) }
+    var menuCardId by rememberSaveable { mutableStateOf<String?>(null) }
+    var muteHeadline by rememberSaveable { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val chips = prefs?.let(viewModel::chips).orEmpty()
     // The New stories button floats just below the chip row, so it never covers the chips.
@@ -247,7 +250,7 @@ fun FeedScreen(
                         onCard = { viewModel.open(context, it) },
                         onShare = { viewModel.share(context, it) },
                         onMore = { menuCardId = it.group.lead.id },
-                        onGroup = { openGroup = it },
+                        onGroup = { openGroupLeadId = it.lead.id },
                     )
                 }
                 val newStories = (state as? FeedState.Content)?.newStories ?: 0
@@ -276,17 +279,25 @@ fun FeedScreen(
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
+        val cards = (state as? FeedState.Content)?.cards
+        val openGroup = openGroupLeadId?.let { id -> cards?.find { it.group.lead.id == id }?.group }
+        // Once the feed has content, a sheet whose card left it (a refresh dropped it) closes
+        // rather than reopening later; before that, a restored sheet waits for the cards.
+        LaunchedEffect(openGroupLeadId, openGroup == null, cards != null) {
+            if (cards != null && openGroup == null) openGroupLeadId = null
+        }
         openGroup?.let { group ->
             StoryGroupSheet(
                 group = group,
                 viewModel = viewModel,
                 onOpen = { viewModel.open(context, it) },
-                onDismiss = { openGroup = null },
+                onDismiss = { openGroupLeadId = null },
             )
         }
-        val menuCard = menuCardId?.let { id -> (state as? FeedState.Content)?.cards?.find { it.group.lead.id == id } }
-        // The card left the feed (a refresh dropped it): close the menu rather than reopen it later.
-        LaunchedEffect(menuCardId, menuCard == null) { if (menuCard == null) menuCardId = null }
+        val menuCard = menuCardId?.let { id -> cards?.find { it.group.lead.id == id } }
+        LaunchedEffect(menuCardId, menuCard == null, cards != null) {
+            if (cards != null && menuCard == null) menuCardId = null
+        }
         menuCard?.let { card ->
             val article = card.group.lead
             CardMenuSheet(
