@@ -274,19 +274,21 @@ class ArticleStore(
 
     /**
      * Replaces the hidden, saved, custom-feed and history tables with the given rows in one
-     * transaction (backup restore). Any failure, such as a duplicate id, rolls all of it back.
+     * transaction (backup restore). A null [history] leaves the history table as it is: a backup
+     * exported without history says nothing about it (B29). Any failure, such as a duplicate id,
+     * rolls all of it back.
      */
     fun replaceUserData(
         hidden: List<HiddenArticle>,
         saved: List<SavedArticle>,
         customFeeds: List<CustomFeed>,
-        history: List<HistoryEntry>,
+        history: List<HistoryEntry>?,
     ) {
         db.transaction {
             db.hiddenQueries.deleteAll()
             db.savedQueries.deleteAll()
             db.customFeedQueries.deleteAll()
-            db.historyQueries.deleteAll()
+            if (history != null) db.historyQueries.deleteAll()
             for (h in hidden) {
                 db.hiddenQueries.insert(h.articleId, h.hiddenAt.toEpochMilliseconds(), h.title, h.outletId, h.url)
             }
@@ -311,7 +313,7 @@ class ArticleStore(
             for (f in customFeeds) {
                 db.customFeedQueries.insert(f.id, f.url, f.title, f.siteUrl, f.kind, f.addedAt.toEpochMilliseconds())
             }
-            for (e in history) {
+            for (e in history.orEmpty()) {
                 val openedAt = e.openedAt.toEpochMilliseconds()
                 db.historyQueries.insert(e.articleId, e.outletId, encodeTopics(e.topics), openedAt)
             }

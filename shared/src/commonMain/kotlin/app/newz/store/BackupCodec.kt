@@ -138,7 +138,8 @@ object BackupCodec {
 
 /**
  * Applies a backup by replacing, not merging: preferences and the hidden, saved, custom-feed and
- * history tables become exactly the backup's (a backup without history clears it). The tables are
+ * history tables become exactly the backup's. A backup exported without history leaves the
+ * phone's history alone (B29), since leaving it out is the export default. The tables are
  * replaced in one SQL transaction; if that fails the previous preferences are written back, so on
  * any error nothing changes.
  */
@@ -154,7 +155,7 @@ class BackupRestorer(
                 contents.hidden,
                 contents.saved,
                 contents.customFeeds,
-                contents.history.orEmpty(),
+                contents.history,
             )
             Result.success(contents.counts())
         } catch (e: CancellationException) {

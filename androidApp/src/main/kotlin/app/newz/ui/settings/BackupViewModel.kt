@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import app.newz.AppGraph
 import app.newz.platform.BackupDocuments
 import app.newz.store.BackupCodec
+import app.newz.store.BackupContents
 import app.newz.store.BackupCounts
 import app.newz.store.BackupRestorer
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +52,11 @@ class BackupViewModel(
 
     private val noteState = MutableStateFlow<BackupNote?>(null)
     val note: StateFlow<BackupNote?> = noteState.asStateFlow()
+
+    private val pendingState = MutableStateFlow<PendingImport?>(null)
+
+    /** A checked backup waiting for the user to confirm the restore; null when none is. */
+    val pendingImport: StateFlow<PendingImport?> = pendingState.asStateFlow()
 
     fun setIncludeHistory(on: Boolean) {
         includeHistoryState.value = on
@@ -99,7 +105,11 @@ class BackupViewModel(
         }
     }
 
-    /** Reads, validates and then applies the backup at [uri]; any failure changes nothing. */
+    /**
+     * Reads and validates the backup at [uri], then holds it in [pendingImport] for the user to
+     * confirm (B29): a restore replaces saved articles and possibly history, which cannot be got
+     * back. An invalid file changes nothing and says so.
+     */
     fun import(
         resolver: ContentResolver,
         uri: Uri,
@@ -113,12 +123,59 @@ class BackupViewModel(
                 noteState.value = BackupNote.ImportFailed
                 return@launch
             }
+            val onPhone =
+                withContext(Dispatchers.IO) {
+                    graph.articleStore.listSaved().size to graph.articleStore.listHistory().size
+                }
+            pendingState.value = PendingImport(contents, savedOnPhone = onPhone.first, historyOnPhone = onPhone.second)
+        }
+    }
+
+    /** The user declined the restore: nothing changes. */
+    fun cancelImport() {
+        pendingState.value = null
+    }
+
+    /** Applies the backup the user confirmed. */
+    fun confirmImport() {
+        val pending = pendingState.value ?: return
+        pendingState.value = null
+        viewModelScope.launch {
             val restored =
                 withContext(Dispatchers.IO) {
-                    BackupRestorer(graph.articleStore, graph.preferencesStore).restore(contents)
+                    BackupRestorer(graph.articleStore, graph.preferencesStore).restore(pending.contents)
                 }
             graph.feedRepository.invalidate()
             noteState.value = restored.fold({ BackupNote.Imported(it) }, { BackupNote.ImportFailed })
         }
     }
 }
+
+/** A valid backup waiting for the user's go-ahead, with what it would replace on this phone. */
+data class PendingImport(
+    val contents: BackupContents,
+    val savedOnPhone: Int,
+    val historyOnPhone: Int,
+)
+
+/** The confirm sheet's message: what the restore replaces, in numbers (B29). */
+fun importConfirmMessage(pending: PendingImport): String {
+    val counts = pending.contents.counts()
+    val saved =
+        "your ${articles(pending.savedOnPhone, "saved article")} with its ${counts.saved}"
+    val history =
+        if (pending.contents.history == null) {
+            "Your reading history on this phone stays as it is."
+        } else {
+            "Your reading history (${articles(
+                pending.historyOnPhone,
+                "opened article",
+            )}) is replaced with the backup's too."
+        }
+    return "This replaces your sources, topics and settings with the backup’s, and $saved. $history It can’t be undone."
+}
+
+private fun articles(
+    n: Int,
+    noun: String,
+): String = if (n == 1) "1 $noun" else "$n ${noun}s"

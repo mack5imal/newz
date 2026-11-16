@@ -178,6 +178,19 @@ class BackupCodecTest {
         }
 
     @Test
+    fun aBackupWithoutHistoryKeepsThePhonesHistory() =
+        runTest {
+            // B29: export leaves history out by default, so importing such a file must not
+            // read as "this backup has no history" and wipe the phone's.
+            val json = populated().export(includeHistory = false)
+            val target = Device()
+            target.articles.recordOpen("id9", "outlet9", listOf("world"), t - 1.hours)
+            val history = target.articles.listHistory()
+            target.restorer.restore(BackupCodec.import(json).getOrThrow()).getOrThrow()
+            assertEquals(history, target.articles.listHistory())
+        }
+
+    @Test
     fun badFilesReturnErrorsAndLeaveStateUnchanged() =
         runTest {
             val target = populated()
