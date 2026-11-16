@@ -1,12 +1,17 @@
 package app.newz.ui.feed
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -202,78 +207,86 @@ fun KeywordMuteSheet(
         focus.requestFocus()
         keyboard?.show()
     }
-    BottomSheet(onDismiss = onDismiss, label = "Mute a keyword") {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .imePadding()
-                .padding(
-                    start = NewzTokens.spaceXl,
-                    end = NewzTokens.spaceXl,
-                    bottom =
-                        NewzTokens.spaceXl + NewzTokens.spaceXs,
-                ),
-        ) {
-            SignageText(text = "Mute a keyword", style = NewzTokens.typeSheetTitle, color = c.ink)
-            PlainText(
-                text = INTRO,
-                style = NewzTokens.typeIntro,
-                color = c.inkMuted,
-                modifier = Modifier.padding(top = NewzTokens.spaceXs),
-            )
-            if (suggestions.isNotEmpty()) {
-                SignageText(
-                    text = "From this headline",
-                    style = NewzTokens.typeLabel,
-                    color = c.inkMuted,
-                    modifier = Modifier.padding(top = NewzTokens.spaceL, bottom = NewzTokens.spaceS),
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(NewzTokens.spaceS),
-                    verticalArrangement = Arrangement.spacedBy(NewzTokens.spaceS),
-                ) {
-                    suggestions.forEach { suggestion ->
-                        TopicChip(
-                            text = suggestion,
-                            selected = suggestion == selected,
-                            onClick = {
-                                text = suggestion
-                                selected = suggestion
-                            },
-                        )
-                    }
-                }
-            }
-            TextField(
-                value = text,
-                onValueChange = {
-                    text = it
-                    selected = null
-                },
-                label = "Keyword or name",
-                placeholder = "Type a word or name",
-                helper = "Matches the whole word, in any capitalization",
-                error = if (tooLong) "Keep it to 60 characters or fewer" else null,
-                maxLength = MAX_KEYWORD_LENGTH,
-                counter = "${text.characterCount()}/60",
-                fieldModifier = Modifier.focusRequester(focus),
-                modifier = Modifier.padding(top = NewzTokens.spaceL + NewzTokens.spaceXs),
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = NewzTokens.spaceL),
-                horizontalArrangement = Arrangement.spacedBy(NewzTokens.spaceS, Alignment.End),
+    // In landscape or at large text the keyboard leaves little room (B51): the body scrolls
+    // and the buttons stay in view above the keyboard.
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val maxSheetHeight = maxHeight - NewzTokens.storySheetTopGap
+        BottomSheet(onDismiss = onDismiss, label = "Mute a keyword") {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = maxSheetHeight)
+                    .imePadding()
+                    .padding(
+                        start = NewzTokens.spaceXl,
+                        end = NewzTokens.spaceXl,
+                        bottom =
+                            NewzTokens.spaceXl + NewzTokens.spaceXs,
+                    ),
             ) {
-                Button(text = "Cancel", onClick = onDismiss, variant = ButtonVariant.Text)
-                Button(
-                    text = "Mute",
-                    onClick = {
-                        val chosen = keyword ?: return@Button
-                        onDismiss()
-                        onMute(chosen)
-                    },
-                    variant = ButtonVariant.Primary,
-                    enabled = keyword != null,
-                )
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                    SignageText(text = "Mute a keyword", style = NewzTokens.typeSheetTitle, color = c.ink)
+                    PlainText(
+                        text = INTRO,
+                        style = NewzTokens.typeIntro,
+                        color = c.inkMuted,
+                        modifier = Modifier.padding(top = NewzTokens.spaceXs),
+                    )
+                    if (suggestions.isNotEmpty()) {
+                        SignageText(
+                            text = "From this headline",
+                            style = NewzTokens.typeLabel,
+                            color = c.inkMuted,
+                            modifier = Modifier.padding(top = NewzTokens.spaceL, bottom = NewzTokens.spaceS),
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(NewzTokens.spaceS),
+                            verticalArrangement = Arrangement.spacedBy(NewzTokens.spaceS),
+                        ) {
+                            suggestions.forEach { suggestion ->
+                                TopicChip(
+                                    text = suggestion,
+                                    selected = suggestion == selected,
+                                    onClick = {
+                                        text = suggestion
+                                        selected = suggestion
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    TextField(
+                        value = text,
+                        onValueChange = {
+                            text = it
+                            selected = null
+                        },
+                        label = "Keyword or name",
+                        placeholder = "Type a word or name",
+                        helper = "Matches the whole word, in any capitalization",
+                        error = if (tooLong) "Keep it to 60 characters or fewer" else null,
+                        maxLength = MAX_KEYWORD_LENGTH,
+                        counter = "${text.characterCount()}/60",
+                        fieldModifier = Modifier.focusRequester(focus),
+                        modifier = Modifier.padding(top = NewzTokens.spaceL + NewzTokens.spaceXs),
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = NewzTokens.spaceL),
+                    horizontalArrangement = Arrangement.spacedBy(NewzTokens.spaceS, Alignment.End),
+                ) {
+                    Button(text = "Cancel", onClick = onDismiss, variant = ButtonVariant.Text)
+                    Button(
+                        text = "Mute",
+                        onClick = {
+                            val chosen = keyword ?: return@Button
+                            onDismiss()
+                            onMute(chosen)
+                        },
+                        variant = ButtonVariant.Primary,
+                        enabled = keyword != null,
+                    )
+                }
             }
         }
     }
