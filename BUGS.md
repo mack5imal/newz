@@ -10,6 +10,68 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 
 ## Open
 
+### B47 — Feed scroll position and screen state lost on every navigation (R12)
+- **Severity:** Medium
+- **Where:** `androidApp/.../ui/nav/Navigation.kt` (`NavHost`)
+- **Seen:** in review. Scrolling 60 cards down, opening Saved and pressing Back lands at the top.
+
+### B48 — Landscape: app bars and settings ignore side insets (R13)
+- **Severity:** Medium
+- **Where:** `androidApp/.../ui/components/AppBars.kt`, `SettingsScreen.kt` (`ScreenFrame`), `NewzApp`
+- **Seen:** in review. With 3-button navigation on the right, Settings and Remove buttons sit under
+  the nav bar; the back arrow sits under the camera cutout.
+
+### B49 — Backup "include history" choice lost if the process dies in the file picker (R21)
+- **Severity:** Low
+- **Where:** `androidApp/.../settings/BackupViewModel.kt`
+- **Seen:** in review. The backup is then written without history, silently.
+
+### B50 — Onboarding picks lost on process death (R22)
+- **Severity:** Low
+- **Where:** `androidApp/.../onboarding/OnboardingViewModel.kt`
+- **Seen:** in review. Switching apps to look up a zip code can lose every pick.
+
+### B51 — Keyword-mute and zip sheets don't scroll; the keyboard hides their buttons (R29)
+- **Severity:** Low
+- **Where:** `androidApp/.../feed/KeywordMuteSheet.kt`, `settings/ZipCodeSheet.kt`
+- **Seen:** in review. In landscape or at large text the Mute/Save row is cut off.
+
+### B52 — TalkBack can reach the screen behind an open sheet (R30)
+- **Severity:** Low
+- **Where:** `androidApp/.../components/Sheets.kt` (`BottomSheet`), `FeedScreen.kt`
+- **Seen:** in review. Swiping past the last sheet action moves focus to the feed behind it.
+
+### B53 — The Undo snackbar ignores the accessibility timeout (R31)
+- **Severity:** Low
+- **Where:** `androidApp/.../components/Feedback.kt`
+- **Seen:** in review. It always closes after 6 s.
+
+### B54 — Card menu, keyword and story-group sheets close on rotation (R32)
+- **Severity:** Low
+- **Where:** `androidApp/.../feed/FeedScreen.kt`
+- **Seen:** in review. Typed keyword text is lost on rotation, dark-mode change or text size change.
+
+### B55 — Saved composes every saved article at once (R33)
+- **Severity:** Low
+- **Where:** `androidApp/.../saved/SavedScreen.kt`
+- **Seen:** in review. A few hundred saved articles all compose and load thumbnails together.
+
+### B56 — Saved's offline banner only updates when the feed changes (R34)
+- **Severity:** Low
+- **Where:** `androidApp/.../saved/SavedViewModel.kt`
+- **Seen:** in review. The banner stays after Wi-Fi returns, and never appears on going offline.
+
+### B57 — Screen view models live as long as the activity (R35)
+- **Severity:** Low
+- **Where:** `androidApp/.../MainActivity.kt`, `ui/nav/Navigation.kt`
+- **Seen:** in review. A Sources snackbar reappears on Settings; Saved keeps collecting when closed.
+
+### B58 — Toolchain script installs an unpinned JDK and edits the global Gradle config (R36)
+- **Severity:** Low
+- **Where:** `scripts/setup-android-toolchain.sh`
+- **Seen:** in review. Downloads Adoptium's moving `latest/17` without a checksum and writes
+  `org.gradle.java.home` into `~/.gradle/gradle.properties`.
+
 ## Fixed
 
 ### B35 — Full-text summaries merge unrelated stories into one card and slow grouping (R7)
