@@ -51,10 +51,10 @@ sealed interface FeedState {
 
     /**
      * [cards] served so far; [failingFeeds] are the ids of followed feeds currently failing.
-     * [newStories] counts the story groups (over the whole feed, before the screen's topic
-     * filter) holding an article that was not in the store at the last re-rank: a load over
-     * shown cards merges them behind the served ones, and [FeedRepository.showNewStories]
-     * brings them to the top (B22).
+     * [newStories] counts the story groups among the first page of a fresh ranking (over the
+     * whole feed, before the screen's topic filter) holding an article that was not in the store
+     * at the last re-rank: a load over shown cards merges them behind the served ones, and
+     * [FeedRepository.showNewStories] brings them to the top (B22).
      */
     data class Content(
         val cards: List<FeedCard>,
@@ -306,7 +306,9 @@ class FeedRepository(
                 newStories = 0
             } else {
                 pager.submit(groups)
-                newStories = groups.count { g -> g.members().any { it.id !in baselineIds } }
+                // Only stories a re-rank would bring onto the first page: an older article seen for
+                // the first time (a slow feed catching up) is not news at the top.
+                newStories = groups.take(pager.pageSize).count { g -> g.members().any { it.id !in baselineIds } }
             }
             if (pager.servedGroups.size < pager.pageSize) pager.page(0)
             savedIds = snapshot.savedIds

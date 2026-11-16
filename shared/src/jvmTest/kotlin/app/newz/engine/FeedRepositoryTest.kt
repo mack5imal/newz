@@ -148,6 +148,25 @@ class FeedRepositoryTest {
             assertEquals(1, h.requestsTo("b"))
         }
 
+    /** B22: an old article seen for the first time ranks below the first page, so it is not a new story. */
+    @Test
+    fun onlyStoriesReachingTheFirstPageCountAsNew() =
+        runTest {
+            val cached = listOf("a", "b", "c", "d", "e", "f")
+            val h = EngineHarness(feedIds = cached + "g")
+            cached.forEachIndexed { i, outlet -> h.cache(outlet, 5, offset = i * 10) }
+            h.items["g"] =
+                listOf(
+                    TestItem("old", EngineHarness.uniqueTitle(900), age = 3.days),
+                    TestItem("fresh", EngineHarness.uniqueTitle(901), age = 0.hours),
+                )
+            val repo = h.repository(backgroundScope)
+            repo.feed.first()
+            repo.refresh().join()
+            val merged = assertIs<FeedState.Content>(repo.feed.first())
+            assertEquals(1, merged.newStories)
+        }
+
     /** A feed landing after the growing publishes is ranked in, not counted as a new story. */
     @Test
     fun aGrowingFirstLoadEndsRerankedWithNoNewStories() =
