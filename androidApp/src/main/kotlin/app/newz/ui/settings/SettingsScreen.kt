@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -292,6 +295,62 @@ internal fun ScreenFrame(
     sheetOpen: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    FrameShell(screen, title, message, onDismissMessage, onBack, trailing, titleContent, sheetOpen) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(top = NewzTokens.spaceCardGap),
+        ) {
+            content()
+            Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+        }
+    }
+}
+
+/**
+ * [ScreenFrame] for a list with no upper bound, such as Saved (B55): only the rows on screen are
+ * composed, so opening the screen and each change stay cheap however long the list grows.
+ */
+@Composable
+internal fun LazyScreenFrame(
+    screen: Screen,
+    title: String,
+    message: FeedMessage?,
+    onDismissMessage: () -> Unit,
+    onBack: () -> Unit,
+    content: LazyListScope.() -> Unit,
+) {
+    FrameShell(
+        screen,
+        title,
+        message,
+        onDismissMessage,
+        onBack,
+        trailing = null,
+        titleContent = null,
+        sheetOpen = false,
+    ) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = NewzTokens.spaceCardGap)) {
+            content()
+            item { Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)) }
+        }
+    }
+}
+
+/** The app bar, the snackbar and the paper behind them, around a frame's [body]. */
+@Composable
+private fun FrameShell(
+    screen: Screen,
+    title: String,
+    message: FeedMessage?,
+    onDismissMessage: () -> Unit,
+    onBack: () -> Unit,
+    trailing: (@Composable RowScope.() -> Unit)?,
+    titleContent: (@Composable RowScope.() -> Unit)?,
+    sheetOpen: Boolean,
+    body: @Composable ColumnScope.() -> Unit,
+) {
     val c = LocalNewzPalette.current
     Box(
         Modifier
@@ -301,15 +360,7 @@ internal fun ScreenFrame(
     ) {
         Column(Modifier.fillMaxSize().hiddenBehindSheet(sheetOpen)) {
             AppBarSub(title = title, onBack = onBack, titleContent = titleContent, trailing = trailing)
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(top = NewzTokens.spaceCardGap),
-            ) {
-                content()
-                Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
-            }
+            body()
         }
         message?.let { m ->
             Snackbar(
