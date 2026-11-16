@@ -68,8 +68,18 @@ object FeedParser {
             title = HtmlText.toPlainText(channel.title.orEmpty()),
             siteUrl = channel.link?.trim()?.ifEmpty { null },
             kind = kind,
-            items = newest(channel.items.mapNotNull(::toItem)),
+            items = newest(distinctGuids(channel.items.mapNotNull(::toItem))),
         )
+    }
+
+    /**
+     * Items whose guid another item with a different link shares get their link as guid (B41).
+     * The article id is a hash of outlet and guid, so a feed that stamps every item with, say,
+     * the site's address would otherwise show as one card that changes on every refresh.
+     */
+    internal fun distinctGuids(items: List<ParsedItem>): List<ParsedItem> {
+        val urlsByGuid = items.groupBy({ it.guid }) { it.url }.mapValues { (_, urls) -> urls.toSet() }
+        return items.map { if ((urlsByGuid[it.guid]?.size ?: 0) > 1) it.copy(guid = it.url) else it }
     }
 
     /** At most [MAX_ITEMS] items per feed: the newest ones (undated count as oldest), in feed order. */

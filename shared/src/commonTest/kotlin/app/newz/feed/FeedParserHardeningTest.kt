@@ -108,6 +108,26 @@ class FeedParserHardeningTest {
         }
 
     @Test
+    fun aGuidRepeatedAcrossItemsFallsBackToEachItemsUrl() =
+        runTest {
+            // B41: a feed that gives every item the site's address as guid must not collapse
+            // into one card.
+            val xml =
+                "<rss version=\"2.0\"><channel><title>G</title><link>https://g.example/</link>" +
+                    (1..3).joinToString("") {
+                        "<item><title>Post $it</title><link>https://g.example/$it</link>" +
+                            "<guid>https://g.example/</guid></item>"
+                    } +
+                    "<item><title>Own</title><link>https://g.example/own</link><guid>own-1</guid></item>" +
+                    "</channel></rss>"
+            val feed = parse(xml)
+            assertEquals(
+                listOf("https://g.example/1", "https://g.example/2", "https://g.example/3", "own-1"),
+                feed.items.map { it.guid },
+            )
+        }
+
+    @Test
     fun brokenImageUrlIsKeptAsAnUnloadableImageNotAnError() =
         runTest {
             val xml =
