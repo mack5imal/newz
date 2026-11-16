@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -94,6 +95,12 @@ class ZipCodeTest {
         assertFalse(prefs.onboarded)
     }
 
+    /** The topic chips and Continue cannot be reached while the zip sheet is open (B52). */
+    private fun assertHiddenBehindSheet() {
+        compose.onAllNodes(hasText("Continue") and hasClickAction()).assertCountEquals(0)
+        compose.onAllNodes(hasText("Local") and isToggleable()).assertCountEquals(0)
+    }
+
     @Test
     fun localNeedsASavedZip() {
         firstLaunch()
@@ -101,8 +108,8 @@ class ZipCodeTest {
         compose.continueButton().assertIsEnabled()
 
         openZipSheet()
-        compose.chip("Local").assertIsOn()
-        compose.continueButton().assertIsNotEnabled()
+        // B52: behind the open sheet the picker is hidden from accessibility services.
+        assertHiddenBehindSheet()
 
         compose.onNode(hasText("Cancel") and hasClickAction()).performClick()
         compose.waitUntil(5_000) { compose.onAllNodesWithText("Your zip code").fetchSemanticsNodes().isEmpty() }
@@ -132,7 +139,7 @@ class ZipCodeTest {
         tapSave()
         compose.waitForText("We couldn’t find that zip code")
         compose.onAllNodesWithText("Enter a 5-digit zip code").assertCountEquals(0)
-        compose.continueButton().assertIsNotEnabled()
+        assertHiddenBehindSheet()
         assertNothingSaved()
 
         typeZip("98101")
