@@ -220,8 +220,11 @@ class BackupScreenTest {
         compose.waitForText("Replace this phone’s choices?", TIMEOUT)
         compose.onNodeWithText("your 0 saved articles with its 1", substring = true).assertExists()
         assertEquals(freshPrefs, currentPrefs())
+        val requestsBefore = server.requests.get()
         tap("Replace")
         compose.waitForText("Backup imported", TIMEOUT)
+        // B30: the restored sources are fetched straight away, not on the next pull.
+        compose.waitUntil(TIMEOUT) { server.requests.get() > requestsBefore }
         compose
             .onNodeWithText(
                 "Restored 7 sources, 6 topics, 1 muted keywords, 1 hidden and 1 saved articles.",

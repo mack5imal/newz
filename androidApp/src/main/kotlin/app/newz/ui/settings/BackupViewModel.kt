@@ -146,6 +146,9 @@ class BackupViewModel(
                     BackupRestorer(graph.articleStore, graph.preferencesStore).restore(pending.contents)
                 }
             graph.feedRepository.invalidate()
+            // The backup usually follows sources the cache has never fetched (a new phone), so
+            // load them now rather than waiting for a pull (B30); re-rank, as after a pull.
+            if (restored.isSuccess) graph.feedRepository.refresh(rerank = true)
             noteState.value = restored.fold({ BackupNote.Imported(it) }, { BackupNote.ImportFailed })
         }
     }
