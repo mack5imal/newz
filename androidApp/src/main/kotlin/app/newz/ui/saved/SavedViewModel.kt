@@ -17,8 +17,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -36,14 +37,17 @@ class SavedViewModel(
     /** Null until [load] has read the store. */
     val saved: StateFlow<List<SavedArticle>?> = savedState.asStateFlow()
 
-    /** True while the phone is offline or the last feed load reached no source. */
+    /**
+     * True while the phone is offline or the last feed load reached no source. Connectivity is
+     * re-checked whenever the network changes, not only when the feed does (B56): coming back
+     * online clears the banner, and going offline shows it.
+     */
     val offline: StateFlow<Boolean> =
-        graph.feedRepository.feed
-            .map { state ->
-                !graph.config.isOnline() ||
-                    (state is FeedState.Content && state.offline) ||
-                    (state is FeedState.Empty && state.reason == EmptyReason.NO_CACHE_OFFLINE)
-            }.stateIn(viewModelScope, SharingStarted.Eagerly, !graph.config.isOnline())
+        combine(graph.feedRepository.feed, graph.connectivityChanges.onStart { emit(Unit) }) { state, _ ->
+            !graph.config.isOnline() ||
+                (state is FeedState.Content && state.offline) ||
+                (state is FeedState.Empty && state.reason == EmptyReason.NO_CACHE_OFFLINE)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, !graph.config.isOnline())
 
     private val messageState = MutableStateFlow<FeedMessage?>(null)
     val message: StateFlow<FeedMessage?> = messageState.asStateFlow()
