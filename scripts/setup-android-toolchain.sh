@@ -10,6 +10,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 AVD_NAME="newz-api34"
 SYSTEM_IMAGE="system-images;android-34;default;arm64-v8a"
 LOCAL_JDK_DIR="$HOME/.local/jdk-17"
+# The exact Temurin build to install when no JDK 17 is present (B58): a fixed release, not
+# whatever "latest" is on the day, so every machine builds and signs with the same JDK.
+TEMURIN_RELEASE="jdk-17.0.20.1+1"
 
 log() { printf '[setup] %s\n' "$*"; }
 
@@ -40,7 +43,7 @@ else
     log "Installing Temurin 17 tarball into $USER_JVM_BUNDLE"
     tmp="$(mktemp -d)"
     curl -fsSL -o "$tmp/jdk.tar.gz" \
-      "https://api.adoptium.net/v3/binary/latest/17/ga/mac/aarch64/jdk/hotspot/normal/eclipse"
+      "https://api.adoptium.net/v3/binary/version/${TEMURIN_RELEASE/+/%2B}/mac/aarch64/jdk/hotspot/normal/eclipse"
     tar -xzf "$tmp/jdk.tar.gz" -C "$tmp"
     bundle="$(find "$tmp" -maxdepth 1 -mindepth 1 -type d -name 'jdk-17*' | head -n 1)"
     mkdir -p "$(dirname "$USER_JVM_BUNDLE")"
@@ -124,7 +127,8 @@ set_property() { # file key value — add or replace one key, leave other lines 
   printf '%s=%s\n' "$key" "$value" >> "$tmp"
   mv "$tmp" "$file"
 }
-set_property "$HOME/.gradle/gradle.properties" "org.gradle.java.home" "$JAVA_HOME"
+# The Gradle daemon finds a JDK 17 itself (gradle/gradle-daemon-jvm.properties), so nothing is
+# written to ~/.gradle, which every Gradle project on this machine reads (B58).
 set_property "$REPO_ROOT/local.properties" "sdk.dir" "$ANDROID_HOME"
 
 log "JAVA_HOME=$JAVA_HOME"
