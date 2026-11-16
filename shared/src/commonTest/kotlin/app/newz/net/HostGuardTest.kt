@@ -94,6 +94,40 @@ class HostGuardTest {
     }
 
     @Test
+    fun blocksGoogleAdAnalyticsHostingAndMirrorDomains() {
+        // B24: hosts the review found unblocked, as feeds really use them.
+        val hosts =
+            listOf(
+                "s0.2mdn.net",
+                "googleadservices.com",
+                "www.googletagservices.com",
+                "app-measurement.com",
+                "img1.blogblog.com",
+                "ghs.googlehosted.com",
+                "gmail.com",
+                "googlemail.com",
+                "lhr25s12-in-f14.1e100.net",
+                "redirector.gvt1.com",
+                "x.page.link",
+                "x.web.app",
+                "x.firebasestorage.app",
+                "www.recaptcha.net",
+                "www.gstatic.cn",
+                "fonts.googleapis.cn",
+                "example-com.cdn.ampproject.org",
+                "ampproject.net",
+                "ad.doubleclick.com",
+                "admob.com",
+                "youtubekids.com",
+            )
+        for (host in hosts) assertTrue(HostGuard.isBlockedHost(host), host)
+        // Look-alikes that are not Google's stay allowed.
+        assertFalse(HostGuard.isBlockedHost("ampproject.org"))
+        assertFalse(HostGuard.isBlockedHost("myweb.app.example"))
+        assertFalse(HostGuard.isBlockedHost("notgmail.com"))
+    }
+
+    @Test
     fun existingPunycodeLabelsAreDecodedBeforeMatching() {
         // B23: the engine decodes `xn--google-` to `google`, so HostGuard must too.
         assertEquals("google.com", HostGuard.normalizeHost("xn--google-.com"))

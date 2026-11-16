@@ -40,6 +40,35 @@ object HostGuard {
             "firebaseio.com",
             "firebaseapp.com",
             "app.goo.gl",
+            // Ad, analytics and tag hosts that feed images and links point at (B24).
+            "2mdn.net",
+            "doubleclick.com",
+            "googleadservices.com",
+            "googletagservices.com",
+            "app-measurement.com",
+            "admob.com",
+            // Blogger's image host, Google-hosted custom domains and Google's own network.
+            "blogblog.com",
+            "googlehosted.com",
+            "1e100.net",
+            "gvt1.com",
+            "gvt2.com",
+            "gvt3.com",
+            // Firebase hosting, dynamic links and storage.
+            "page.link",
+            "web.app",
+            "firebasestorage.app",
+            // Mirrors of Google services under other names.
+            "recaptcha.net",
+            "gstatic.cn",
+            "googleapis.cn",
+            "googleusercontent.cn",
+            // The AMP cache is served by Google.
+            "cdn.ampproject.org",
+            "ampproject.net",
+            "gmail.com",
+            "googlemail.com",
+            "youtubekids.com",
         )
 
     /** Second-level labels that sit between `google` and a country code, as in google.co.uk. */
