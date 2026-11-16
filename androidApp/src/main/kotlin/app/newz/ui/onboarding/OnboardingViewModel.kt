@@ -58,6 +58,22 @@ class OnboardingViewModel(
         localState.value = area
     }
 
+    /**
+     * Puts back picks the screen saved, after process death gave it a new, empty view model
+     * (B50). The picks live only here until Continue (nothing is written to preferences before
+     * then), so without this a user who left to look up their zip came back to nothing picked.
+     * A view model that already has picks keeps them; unknown topic ids are dropped.
+     */
+    fun restore(
+        picked: Set<String>,
+        local: LocalArea?,
+    ) {
+        if (pickedState.value.isNotEmpty() || picked.isEmpty()) return
+        val known = topics.mapTo(HashSet()) { it.id }
+        pickedState.value = picked.filterTo(LinkedHashSet()) { it in known }
+        if (Catalog.LOCAL_TOPIC in pickedState.value) localState.value = local
+    }
+
     /** Continue is allowed with [MIN_TOPICS] picked, and a saved zip when Local is one of them. */
     fun canContinue(
         picked: Set<String>,
