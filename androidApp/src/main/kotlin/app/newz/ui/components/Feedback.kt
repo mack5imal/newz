@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -58,8 +59,18 @@ fun Snackbar(
     val c = palette()
     if (onTimeout != null) {
         val timeout = rememberUpdatedState(onTimeout)
-        LaunchedEffect(timeoutKey) {
-            delay(NewzTokens.snackbarTimeout)
+        // The user's "Time to take action" setting stretches the 6 s (B53): a TalkBack or switch
+        // user who hears the whole message first still has time to reach Undo.
+        val accessibility = LocalAccessibilityManager.current
+        val millis =
+            accessibility?.calculateRecommendedTimeoutMillis(
+                NewzTokens.snackbarTimeout,
+                containsIcons = false,
+                containsText = true,
+                containsControls = actionLabel != null,
+            ) ?: NewzTokens.snackbarTimeout
+        LaunchedEffect(timeoutKey, millis) {
+            delay(millis)
             timeout.value()
         }
     }
