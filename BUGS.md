@@ -9,6 +9,22 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 
 ## Open
 
+### B22 — After a refresh, old articles sit at the top; new ones are scattered down the feed
+- **Severity:** Medium
+- **Where:** `shared/src/commonMain/kotlin/app/newz/engine/FeedPager.kt` (`submit`),
+  `FeedRanker.kt` (`rank`), `FeedRepository.kt` (`onLoaded` → `publish(reset = …)`)
+- **Seen:** on the phone after a few weeks of use: after refreshing, many cards near the top are
+  old, and the newer articles are spread through the whole list.
+- **Requested:** new articles at the top. Keep mixing sources, but order mainly by recency.
+- **Likely cause (two parts):**
+  1. A refresh over cards already on screen never re-ranks: `FeedPager.submit` keeps every
+     served card (the first 20) in place and queues new articles behind them, so fresh stories
+     start at card 21 or later. The app's cache-first start does the same: it shows the cached
+     (older) cards, then merges the load's new articles behind them.
+  2. The ranker interleaves topic queues by stride (Normal 1, More 2, Much more 3), so every topic
+     gets its turn near the top however old its newest article is: a quiet topic's day-old story
+     sits between minutes-old ones.
+
 
 ## Fixed
 
