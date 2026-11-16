@@ -37,6 +37,7 @@ import app.newz.ui.components.PlainText
 import app.newz.ui.components.SegmentedControl
 import app.newz.ui.components.Snackbar
 import app.newz.ui.components.Switch
+import app.newz.ui.components.hiddenBehindSheet
 import app.newz.ui.feed.FeedMessage
 import app.newz.ui.nav.Screen
 import app.newz.ui.theme.LocalNewzPalette
@@ -82,7 +83,7 @@ fun SettingsScreen(
     val counts by viewModel.counts.collectAsState()
     var confirmClear by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.reload() }
-    SettingsFrame(Screen.Settings, "Settings", viewModel, destinations.onBack) {
+    SettingsFrame(Screen.Settings, "Settings", viewModel, destinations.onBack, sheetOpen = confirmClear) {
         val p = prefs ?: return@SettingsFrame
         val sources = viewModel.sources(p, counts)
         val failing = sources.count { it.failingSince != null }
@@ -261,10 +262,20 @@ internal fun SettingsFrame(
     viewModel: SettingsViewModel,
     onBack: () -> Unit,
     trailing: (@Composable RowScope.() -> Unit)? = null,
+    sheetOpen: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val message by viewModel.message.collectAsState()
-    ScreenFrame(screen, title, message, viewModel::dismissMessage, onBack, trailing, content = content)
+    ScreenFrame(
+        screen,
+        title,
+        message,
+        viewModel::dismissMessage,
+        onBack,
+        trailing,
+        sheetOpen = sheetOpen,
+        content = content,
+    )
 }
 
 /** [SettingsFrame] for any screen with its own [message] (a `Snackbar`, cleared by [onDismissMessage]). */
@@ -277,6 +288,8 @@ internal fun ScreenFrame(
     onBack: () -> Unit,
     trailing: (@Composable RowScope.() -> Unit)? = null,
     titleContent: (@Composable RowScope.() -> Unit)? = null,
+    /** True while this screen shows a sheet: its content is then hidden from TalkBack (B52). */
+    sheetOpen: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val c = LocalNewzPalette.current
@@ -286,7 +299,7 @@ internal fun ScreenFrame(
             .background(c.paper)
             .testTag(Screen.tagOf(screen)),
     ) {
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().hiddenBehindSheet(sheetOpen)) {
             AppBarSub(title = title, onBack = onBack, titleContent = titleContent, trailing = trailing)
             Column(
                 Modifier

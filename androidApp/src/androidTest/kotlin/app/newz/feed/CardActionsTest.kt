@@ -2,6 +2,8 @@ package app.newz.feed
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
@@ -9,6 +11,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.newz.AppGraph
 import app.newz.MainActivity
@@ -93,6 +96,30 @@ class CardActionsTest {
             .onAllNodes(hasTestTag(FeedSemantics.CARD_TAG) and hasText(title))
             .fetchSemanticsNodes()
             .isEmpty()
+
+    @Test
+    fun theFeedBehindAnOpenMenuIsHiddenFromTalkBack() {
+        // B52: TalkBack used to move past the sheet's last action onto the cards behind it.
+        server.fill(itemsPerFeed = 3)
+        start()
+        val title = titleOf(compose.servedCards().first())
+        compose.openCardMenu(title)
+        assertTrue(
+            "no feed card is reachable behind the sheet",
+            compose.onAllNodes(hasTestTag(FeedSemantics.CARD_TAG)).fetchSemanticsNodes().isEmpty(),
+        )
+        assertTrue(
+            "the app bar's Settings button is not reachable either",
+            compose.onAllNodes(hasText("Settings") and hasClickAction()).fetchSemanticsNodes().isEmpty(),
+        )
+        compose.onNodeWithText("Hide this article").assertExists()
+
+        compose.onNode(hasContentDescription("More actions")).assertDoesNotExist()
+        Espresso.pressBack()
+        compose.waitUntil(
+            TIMEOUT,
+        ) { compose.onAllNodes(hasTestTag(FeedSemantics.CARD_TAG)).fetchSemanticsNodes().isNotEmpty() }
+    }
 
     @Test
     fun hideRemovesTheCardUndoRestoresItAndAHideSurvivesRefreshAndRecreation() {

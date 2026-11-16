@@ -63,6 +63,7 @@ import app.newz.ui.components.Snackbar
 import app.newz.ui.components.StatePanel
 import app.newz.ui.components.TopicChip
 import app.newz.ui.components.TopicChipRow
+import app.newz.ui.components.hiddenBehindSheet
 import app.newz.ui.components.rememberFlapBoardState
 import app.newz.ui.theme.LocalNewzPalette
 import app.newz.ui.theme.NewzIcons
@@ -183,8 +184,9 @@ fun FeedScreen(
     LoadMoreEffect(listState, served, viewModel::loadMore)
     LaunchedEffect(listState) { viewModel.scrollToTop.collect { listState.animateScrollToItem(0) } }
 
+    val sheetOpen = openGroupLeadId != null || menuCardId != null || muteHeadline != null
     Box(Modifier.fillMaxSize().background(c.paper)) {
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().hiddenBehindSheet(sheetOpen)) {
             // One source of truth for the wordmark's motion and the refresh message (B18): the
             // board is driven here, so the message can't outlive it even if the bar isn't shown.
             val board = rememberFlapBoardState(busy)

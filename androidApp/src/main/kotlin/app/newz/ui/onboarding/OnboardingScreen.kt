@@ -34,6 +34,7 @@ import app.newz.ui.components.NoteRow
 import app.newz.ui.components.PlainText
 import app.newz.ui.components.SplitRule
 import app.newz.ui.components.TopicChip
+import app.newz.ui.components.hiddenBehindSheet
 import app.newz.ui.local.LocalArea
 import app.newz.ui.local.LocalAreaNote
 import app.newz.ui.local.ZipCodeSheet
@@ -84,7 +85,7 @@ fun OnboardingScreen(
             .background(c.paper)
             .testTag(Screen.tagOf(Screen.Onboarding)),
     ) {
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().hiddenBehindSheet(zipSheetOpen)) {
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                 OnboardingHeader()
                 SplitRule()

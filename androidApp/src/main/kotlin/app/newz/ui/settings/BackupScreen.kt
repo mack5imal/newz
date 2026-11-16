@@ -64,7 +64,7 @@ fun BackupScreen(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = NewzTokens.spaceL, vertical = NewzTokens.spaceL)
-    SettingsFrame(Screen.Backup, "Backup & restore", settings, onBack) {
+    SettingsFrame(Screen.Backup, "Backup & restore", settings, onBack, sheetOpen = pendingImport != null) {
         Intro(BACKUP_INTRO)
         Panel(title = "Export") {
             Checkbox(
