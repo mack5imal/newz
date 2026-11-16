@@ -118,6 +118,11 @@ class BackupScreenTest {
         compose.onNode(hasText(label) and hasClickAction()).performScrollTo().performClick()
     }
 
+    /** A button on a sheet: sheets do not scroll, so there is nothing to scroll it into view in. */
+    private fun tapInSheet(label: String) {
+        compose.onNode(hasText(label) and hasClickAction()).performClick()
+    }
+
     /** Taps "Export to a file" with the picker answering [file]; returns the written JSON. */
     private fun exportTo(file: File): String {
         stubPickers(file)
@@ -221,7 +226,7 @@ class BackupScreenTest {
         compose.onNodeWithText("your 0 saved articles with its 1", substring = true).assertExists()
         assertEquals(freshPrefs, currentPrefs())
         val requestsBefore = server.requests.get()
-        tap("Replace")
+        tapInSheet("Replace")
         compose.waitForText("Backup imported", TIMEOUT)
         // B30: the restored sources are fetched straight away, not on the next pull.
         compose.waitUntil(TIMEOUT) { server.requests.get() > requestsBefore }
@@ -268,7 +273,7 @@ class BackupScreenTest {
         tap("Choose a backup file")
         compose.waitForText("Replace this phone’s choices?", TIMEOUT)
         compose.onNodeWithText("Your reading history on this phone stays as it is.", substring = true).assertExists()
-        tap("Cancel")
+        tapInSheet("Cancel")
         compose.waitUntil(TIMEOUT) {
             compose.onAllNodes(hasText("Replace this phone’s choices?")).fetchSemanticsNodes().isEmpty()
         }
