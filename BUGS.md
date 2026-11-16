@@ -9,6 +9,8 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 
 ## Open
 
+## Fixed
+
 ### B22 — After a refresh, old articles sit at the top; new ones are scattered down the feed
 - **Severity:** Medium
 - **Where:** `shared/src/commonMain/kotlin/app/newz/engine/FeedPager.kt` (`submit`),
@@ -24,9 +26,10 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
   2. The ranker interleaves topic queues by stride (Normal 1, More 2, Much more 3), so every topic
      gets its turn near the top however old its newest article is: a quiet topic's day-old story
      sits between minutes-old ones.
-
-
-## Fixed
+- **Fixed in:** `e5ef8c0` (recency bands stretched by topic level), `d5387bf` (pull to refresh
+  re-ranks; loads over shown cards count new stories), `1e31e54` + `51e074f` (New stories button
+  below the chips; tap re-ranks and scrolls up), `4cf2029` (count only stories that reach the
+  first page).
 
 ### B18 — Wordmark animation only flashes now that loads are fast
 - **Severity:** Low (regression from B17's speed-up)
