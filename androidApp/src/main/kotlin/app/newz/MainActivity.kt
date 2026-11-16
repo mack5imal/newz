@@ -9,7 +9,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -67,7 +72,15 @@ fun NewzApp(graph: AppGraph = remember { AppGraph.get() }) {
             ThemeMode.DARK -> true
         }
     NewzTheme(darkTheme = dark, textSize = prefs?.textSize ?: TextSize.DEFAULT) {
-        Box(Modifier.fillMaxSize().background(LocalNewzPalette.current.paper)) {
+        // The app draws edge to edge, and in landscape the navigation bar and the camera cutout
+        // sit at the sides: every screen is kept clear of them here, once (B48). The paper
+        // background still runs under them.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(LocalNewzPalette.current.paper)
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
+        ) {
             prefs?.let { NewzNavigation(graph, it) }
         }
     }
