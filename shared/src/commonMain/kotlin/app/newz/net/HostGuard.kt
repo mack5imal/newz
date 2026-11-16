@@ -98,8 +98,33 @@ object HostGuard {
         val engine =
             normalizeHost(if (':' in engineHost && !engineHost.startsWith("[")) "[$engineHost]" else engineHost)
                 ?: return true
+        if (isRefusedIpLiteral(own) || isRefusedIpLiteral(engine)) return true
         return isGoogleHost(own) || isGoogleHost(engine)
     }
+
+    /**
+     * True for an IP-address host other than loopback (B26). A name check cannot tell a Google
+     * address (142.250.80.46) from any other, and a literal lets a feed make the phone open a
+     * connection to an address it chose, LAN addresses included. Loopback never leaves the
+     * phone, and the UI tests' feed server listens on 127.0.0.1.
+     *
+     * A host whose last label is numeric counts as an address in any spelling: the resolvers
+     * also read `2130706433` or `0x7f.1` as addresses, and no real top-level domain is numeric.
+     */
+    internal fun isRefusedAddress(host: String): Boolean {
+        val bracketed = if (':' in host && !host.startsWith("[")) "[$host]" else host
+        return isRefusedIpLiteral(normalizeHost(bracketed) ?: return false)
+    }
+
+    private fun isRefusedIpLiteral(normalized: String): Boolean {
+        if (normalized.startsWith("[")) return normalized != "[::1]"
+        val last = normalized.substringAfterLast('.')
+        val numeric = last.isNotEmpty() && (last.all { it.isDigit() } || last.startsWith("0x"))
+        if (!numeric) return false
+        return !LOOPBACK_V4.matches(normalized)
+    }
+
+    private val LOOPBACK_V4 = Regex("127\\.(25[0-5]|2[0-4]\\d|1?\\d?\\d)(\\.(25[0-5]|2[0-4]\\d|1?\\d?\\d)){2}")
 
     private fun isGoogleHost(normalized: String): Boolean {
         if (normalized.isEmpty()) return true

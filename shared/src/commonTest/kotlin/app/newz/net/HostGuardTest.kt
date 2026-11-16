@@ -62,13 +62,33 @@ class HostGuardTest {
         assertFalse(HostGuard.isBlocked("https://googleplex-fan.example/"))
         assertFalse(HostGuard.isBlocked("https://notgoogle.com/"))
         assertFalse(HostGuard.isBlocked("https://mygoo.gl.example/"))
-        assertFalse(HostGuard.isBlocked("http://192.0.2.1:8080/feed"))
+        assertFalse(HostGuard.isBlocked("https://1password.example/"))
+        assertFalse(HostGuard.isBlocked("https://news.123.example/"))
     }
 
     @Test
     fun allowsLoopbackHostsTheUiTestFeedServerUses() {
         assertFalse(HostGuard.isBlocked("http://127.0.0.1:41234/feed/0.xml"))
         assertFalse(HostGuard.isBlocked("http://localhost:41234/img/3.png"))
+        assertFalse(HostGuard.isBlocked("http://[::1]:41234/feed/0.xml"))
+        assertFalse(HostGuard.isBlockedHost("::1"))
+    }
+
+    @Test
+    fun ipLiteralHostsOtherThanLoopbackAreBlocked() {
+        // B26: an address cannot be checked against Google's names, and a literal lets a feed
+        // point the phone at any address it likes.
+        assertTrue(HostGuard.isBlocked("https://142.250.80.46/x.jpg"))
+        assertTrue(HostGuard.isBlocked("https://8.8.8.8/"))
+        assertTrue(HostGuard.isBlocked("http://192.0.2.1:8080/feed"))
+        assertTrue(HostGuard.isBlocked("http://192.168.1.1/admin"))
+        assertTrue(HostGuard.isBlocked("https://[2001:db8::1]:8443/feed"))
+        assertTrue(HostGuard.isBlocked("https://[::ffff:8.8.8.8]/"))
+        assertTrue(HostGuard.isBlockedHost("2001:4860:4860::8888"))
+        // Other spellings of an address that resolvers accept.
+        assertTrue(HostGuard.isBlocked("https://134744072/"))
+        assertTrue(HostGuard.isBlocked("https://0x8.0x8.0x8.0x8/"))
+        assertTrue(HostGuard.isBlocked("https://8.8.2056/"))
     }
 
     @Test
@@ -164,7 +184,7 @@ class HostGuardTest {
         assertFalse(HostGuard.isBlocked("https://%62bc.co.uk/news"))
         assertFalse(HostGuard.isBlocked("https://b%C3%BCcher.example/feed"))
         assertFalse(HostGuard.isBlocked("https://nytimes.com/"))
-        assertFalse(HostGuard.isBlocked("https://[2001:db8::1]:8443/feed"))
+        assertFalse(HostGuard.isBlocked("http://[::1]:8443/feed"))
     }
 
     @Test

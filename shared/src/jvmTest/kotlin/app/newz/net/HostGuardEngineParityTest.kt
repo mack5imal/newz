@@ -78,7 +78,8 @@ class HostGuardEngineParityTest {
             // interceptors and DNS wrapper must still refuse before any lookup.
             val dns = RecordingDns()
             val client = HttpClient(okHttpEngine(dns)) { followRedirects = false }
-            for (url in disguised + "https://google.com/") {
+            val literals = listOf("https://142.250.80.46/x.jpg", "https://[::ffff:8.8.8.8]/", "https://134744072/")
+            for (url in disguised + "https://google.com/" + literals) {
                 val error = runCatching { client.get(url) }.exceptionOrNull()
                 assertTrue(error != null, url)
             }
