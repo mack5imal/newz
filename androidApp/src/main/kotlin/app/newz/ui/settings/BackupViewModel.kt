@@ -9,7 +9,6 @@ import app.newz.platform.BackupDocuments
 import app.newz.store.BackupCodec
 import app.newz.store.BackupContents
 import app.newz.store.BackupCounts
-import app.newz.store.BackupRestorer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -136,19 +135,15 @@ class BackupViewModel(
         pendingState.value = null
     }
 
-    /** Applies the backup the user confirmed. */
+    /**
+     * Applies the backup the user confirmed. The restore runs in the app's scope
+     * ([AppGraph.restoreBackup]); this only waits for it to show the note.
+     */
     fun confirmImport() {
         val pending = pendingState.value ?: return
         pendingState.value = null
         viewModelScope.launch {
-            val restored =
-                withContext(Dispatchers.IO) {
-                    BackupRestorer(graph.articleStore, graph.preferencesStore).restore(pending.contents)
-                }
-            graph.feedRepository.invalidate()
-            // The backup usually follows sources the cache has never fetched (a new phone), so
-            // load them now rather than waiting for a pull (B30); re-rank, as after a pull.
-            if (restored.isSuccess) graph.feedRepository.refresh(rerank = true)
+            val restored = graph.restoreBackup(pending.contents).await()
             noteState.value = restored.fold({ BackupNote.Imported(it) }, { BackupNote.ImportFailed })
         }
     }

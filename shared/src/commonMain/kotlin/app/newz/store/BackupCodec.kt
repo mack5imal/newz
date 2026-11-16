@@ -1,14 +1,12 @@
 package app.newz.store
 
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
-import kotlin.coroutines.cancellation.CancellationException
 
 /** What a backup file holds. [history] is null when the backup was made without it. */
 @Serializable
@@ -139,31 +137,35 @@ object BackupCodec {
 /**
  * Applies a backup by replacing, not merging: preferences and the hidden, saved, custom-feed and
  * history tables become exactly the backup's. A backup exported without history leaves the
- * phone's history alone (B29), since leaving it out is the export default. The tables are
- * replaced in one SQL transaction; if that fails the previous preferences are written back, so on
- * any error nothing changes.
+ * phone's history alone (B29), since leaving it out is the export default.
+ *
+ * The tables are replaced first, in one SQL transaction that rolls itself back on failure; the
+ * preferences follow, and if writing them fails the old tables are put back, so on any error
+ * nothing changes (B33). The whole restore runs to the end even when its caller is cancelled:
+ * stopping between the two stores would pair the backup's tables with the old preferences.
  */
 class BackupRestorer(
     private val articles: ArticleStore,
     private val preferences: PreferencesStore,
 ) {
-    suspend fun restore(contents: BackupContents): Result<BackupCounts> {
-        val previous = preferences.prefs.first()
-        preferences.replace(contents.prefs)
-        return try {
-            articles.replaceUserData(
-                contents.hidden,
-                contents.saved,
-                contents.customFeeds,
-                contents.history,
-            )
+    suspend fun restore(contents: BackupContents): Result<BackupCounts> =
+        withContext(NonCancellable) {
+            val hidden = articles.listHidden()
+            val saved = articles.listSaved()
+            val customFeeds = articles.listCustomFeeds()
+            // History is only replaced when the backup carries it, so only then is it kept aside.
+            val history = if (contents.history != null) articles.listHistory() else null
+            try {
+                articles.replaceUserData(contents.hidden, contents.saved, contents.customFeeds, contents.history)
+            } catch (e: Exception) {
+                return@withContext Result.failure(e)
+            }
+            try {
+                preferences.replace(contents.prefs)
+            } catch (e: Exception) {
+                articles.replaceUserData(hidden, saved, customFeeds, history)
+                return@withContext Result.failure(e)
+            }
             Result.success(contents.counts())
-        } catch (e: CancellationException) {
-            withContext(NonCancellable) { preferences.replace(previous) }
-            throw e
-        } catch (e: Exception) {
-            withContext(NonCancellable) { preferences.replace(previous) }
-            Result.failure(e)
         }
-    }
 }
