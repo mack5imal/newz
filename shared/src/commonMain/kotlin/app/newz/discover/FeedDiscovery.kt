@@ -88,8 +88,11 @@ class FeedDiscovery(
         parseOrNull(page)?.let { return found(address.url, page.finalUrl, it, prefs, customFeeds) }
         val html = FeedParser.decode(page.bytes, page.charset)
         if (!HTML_MARKER.containsMatchIn(html)) return DiscoveryResult.NoFeed
-        val feedUrl = feedLink(html, page.finalUrl) ?: return DiscoveryResult.NoFeed
-        if (HostGuard.isBlocked(feedUrl)) return DiscoveryResult.Google
+        val candidates = feedLinks(html, page.finalUrl)
+        if (candidates.isEmpty()) return DiscoveryResult.NoFeed
+        // A site may list a FeedBurner feed before its own (B28): refuse only when every
+        // declared feed is Google's.
+        val feedUrl = candidates.firstOrNull { !HostGuard.isBlocked(it) } ?: return DiscoveryResult.Google
         val feedPage =
             when (val fetched = fetch(feedUrl)) {
                 is Fetched.Stop -> return fetched.result
@@ -191,15 +194,22 @@ class FeedDiscovery(
         private val FEED_TYPES = setOf("application/rss+xml", "application/atom+xml")
         private val HTTP_SCHEMES = setOf("http", "https")
 
-        /**
-         * The first `<link rel="alternate" type="application/rss+xml|atom+xml" href>` in [html]
-         * whose href resolves against [baseUrl] to an http(s) URL; null when there is none. A
-         * candidate that fails to resolve or has another scheme (e.g. `feed://`) is skipped.
-         */
+        /** The first of [feedLinks]; null when there is none. */
         fun feedLink(
             html: String,
             baseUrl: String,
-        ): String? {
+        ): String? = feedLinks(html, baseUrl).firstOrNull()
+
+        /**
+         * Every `<link rel="alternate" type="application/rss+xml|atom+xml" href>` in [html], in
+         * document order, whose href resolves against [baseUrl] to an http(s) URL. A candidate
+         * that fails to resolve or has another scheme (e.g. `feed://`) is skipped.
+         */
+        fun feedLinks(
+            html: String,
+            baseUrl: String,
+        ): List<String> {
+            val links = mutableListOf<String>()
             for (tag in LINK_TAG.findAll(html)) {
                 val attrs =
                     ATTRIBUTE.findAll(tag.value).associate { m ->
@@ -222,13 +232,13 @@ class FeedDiscovery(
                         continue
                     }
                 if (resolved.protocol.name.lowercase() !in HTTP_SCHEMES) continue
-                return try {
-                    resolved.buildString()
+                try {
+                    links += resolved.buildString()
                 } catch (_: Exception) {
                     continue
                 }
             }
-            return null
+            return links
         }
     }
 }

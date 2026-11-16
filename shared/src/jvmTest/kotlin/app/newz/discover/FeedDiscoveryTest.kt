@@ -67,6 +67,8 @@ class FeedDiscoveryTest {
     private fun html(head: String) =
         "<!DOCTYPE html><html><head><title>Site</title>$head</head><body><p>Hello</p></body></html>"
 
+    private fun feedLinkTag(href: String) = """<link rel="alternate" type="application/rss+xml" href="$href">"""
+
     private val xmlHeaders = headersOf(HttpHeaders.ContentType, "application/xml; charset=utf-8")
     private val htmlHeaders = headersOf(HttpHeaders.ContentType, "text/html; charset=utf-8")
 
@@ -226,6 +228,29 @@ class FeedDiscoveryTest {
                 )
             assertEquals(DiscoveryResult.Google, discovery(e).discover("kitchen.example"))
             assertEquals(1, e.requestHistory.size)
+        }
+
+    @Test
+    fun aGoogleFeedDeclaredFirstIsSkippedForThePublishersOwn() =
+        runTest {
+            // B28: an older WordPress site lists FeedBurner first and its own feed second.
+            val e =
+                engine(
+                    mapOf(
+                        "https://kitchen.example" to {
+                            respond(
+                                html(
+                                    feedLinkTag("https://feeds.feedburner.com/kitchen") + feedLinkTag("/feed/"),
+                                ),
+                                headers = htmlHeaders,
+                            )
+                        },
+                        "https://kitchen.example/feed/" to { respond(rss, headers = xmlHeaders) },
+                    ),
+                )
+            val found = assertIs<DiscoveryResult.Found>(discovery(e).discover("kitchen.example"))
+            assertEquals("https://kitchen.example/feed/", found.feedUrl)
+            assertTrue(e.requestHistory.none { "feedburner" in it.url.host })
         }
 
     @Test
