@@ -13,6 +13,13 @@ import app.newz.filter.KeywordMatcher
 object TextFeatures {
     const val ENTITY_WEIGHT = 1.0
 
+    /**
+     * How many of a summary's words count (B35). The same-story threshold was tuned on headlines
+     * with short summaries; a full article body shares so many everyday words with others that
+     * unrelated stories merged into one card, and grouping slowed with every extra word.
+     */
+    const val SUMMARY_WORDS = 40
+
     /** Term frequencies of [headline] plus [summary] (when present), weighted as described above. */
     fun terms(
         headline: String,
@@ -20,8 +27,23 @@ object TextFeatures {
     ): Map<String, Double> {
         val out = mutableMapOf<String, Double>()
         addTerms(headline, out)
-        if (!summary.isNullOrBlank()) addTerms(summary, out)
+        if (!summary.isNullOrBlank()) addTerms(opening(summary), out)
         return out
+    }
+
+    /** The first [SUMMARY_WORDS] whitespace-separated words of [summary]. */
+    private fun opening(summary: String): String {
+        var words = 0
+        var inWord = false
+        for ((i, c) in summary.withIndex()) {
+            if (c.isWhitespace()) {
+                if (inWord && ++words == SUMMARY_WORDS) return summary.substring(0, i)
+                inWord = false
+            } else {
+                inWord = true
+            }
+        }
+        return summary
     }
 
     private fun addTerms(

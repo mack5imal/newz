@@ -35,6 +35,19 @@ object FeedParser {
     /** A feed with thousands of items is cut to its newest [MAX_ITEMS] (the feed only shows 7 days). */
     const val MAX_ITEMS = 300
 
+    /**
+     * The longest summary kept (B35), cut on a word boundary. Full-text feeds put whole article
+     * bodies in `<description>`; a card shows a few lines, and grouping reads only the opening.
+     */
+    const val MAX_SUMMARY_CHARS = 400
+
+    /** [text] cut to at most [MAX_SUMMARY_CHARS] at the last space, with an ellipsis when cut. */
+    internal fun capSummary(text: String): String {
+        if (text.length <= MAX_SUMMARY_CHARS) return text
+        val cut = text.lastIndexOf(' ', MAX_SUMMARY_CHARS).takeIf { it > 0 } ?: MAX_SUMMARY_CHARS
+        return text.substring(0, cut).trimEnd() + "…"
+    }
+
     private val PROLOG = Regex("^\\s*<\\?xml[^>]*\\?>")
     private val PROLOG_ENCODING = Regex("^\\s*<\\?xml[^>]*encoding\\s*=\\s*[\"']([A-Za-z0-9._:-]+)[\"']")
 
@@ -172,7 +185,7 @@ object FeedParser {
             guid = item.guid?.trim()?.ifEmpty { null } ?: url,
             url = url,
             title = title,
-            summary = body?.let(HtmlText::toPlainText)?.ifEmpty { null },
+            summary = body?.let(HtmlText::toPlainText)?.ifEmpty { null }?.let(::capSummary),
             imageUrl = imageOf(item),
             publishedAt = FeedDates.parse(item.pubDate),
         )
