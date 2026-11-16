@@ -128,6 +128,32 @@ class FeedParserHardeningTest {
         }
 
     @Test
+    fun trackingPixelsAreSkippedWhenPickingTheCardPicture() =
+        runTest {
+            // B40: the first <img> was taken even when it was a 1x1 beacon on an analytics host.
+            fun withDescription(html: String) =
+                "<rss version=\"2.0\"><channel><title>P</title><link>https://p.example/</link>" +
+                    "<item><title>Story</title><link>https://p.example/a</link>" +
+                    "<description><![CDATA[$html]]></description></item></channel></rss>"
+            val lead = "<img src=\"https://p.example/lead.jpg\" width=\"800\">"
+            val cases =
+                listOf(
+                    "<img src=\"https://stats.example/s.gif\" width=\"1\" height=\"1\">$lead",
+                    "<img height='0' src='https://stats.example/s?id=9'>$lead",
+                    "<img src=\"https://stats.example/pixel.gif\">$lead",
+                    "<img src=\"https://stats.example/beacon/abc\">$lead",
+                    "<img src=\"https://p.example/1x1.png\">$lead",
+                )
+            for (html in cases) {
+                assertEquals("https://p.example/lead.jpg", parse(withDescription(html)).items.single().imageUrl, html)
+            }
+            assertEquals(
+                null,
+                parse(withDescription("<img src=\"https://stats.example/s.gif\" width=\"1\">")).items.single().imageUrl,
+            )
+        }
+
+    @Test
     fun brokenImageUrlIsKeptAsAnUnloadableImageNotAnError() =
         runTest {
             val xml =

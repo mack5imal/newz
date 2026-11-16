@@ -42,8 +42,20 @@ object FeedParser {
     private val DOCTYPE = Regex("<!DOCTYPE[^\\[>]*(\\[[\\s\\S]*?])?\\s*>", RegexOption.IGNORE_CASE)
     private val DECLARATION = Regex("<!(DOCTYPE|ENTITY)", RegexOption.IGNORE_CASE)
     private val ROOT = Regex("<([A-Za-z_][\\w.-]*:)?(rss|feed|RDF)\\b")
-    private val IMG_SRC =
-        Regex("<img\\b[^>]*?\\bsrc\\s*=\\s*(\"([^\"]*)\"|'([^']*)'|([^\\s>]+))", RegexOption.IGNORE_CASE)
+    private val IMG_TAG = Regex("<img\\b[^>]*>", RegexOption.IGNORE_CASE)
+    private val IMG_SRC_ATTR = imgAttribute("src")
+    private val IMG_WIDTH_ATTR = imgAttribute("width")
+    private val IMG_HEIGHT_ATTR = imgAttribute("height")
+
+    /** Addresses that read like a tracking pixel: a pixel/beacon/spacer file, or a beacon path. */
+    private val TRACKING_SRC =
+        Regex(
+            "(pixel|beacon|spacer|blank|1x1)[^/?#]*\\.(gif|png)([?#]|$)|/(pixel|beacon|track|tracking)(/|\\?|$)",
+            RegexOption.IGNORE_CASE,
+        )
+
+    private fun imgAttribute(name: String) =
+        Regex("\\s$name\\s*=\\s*(\"([^\"]*)\"|'([^']*)'|([^\\s>]+))", RegexOption.IGNORE_CASE)
 
     /**
      * Parses [bytes]. The charset comes from the XML prolog, else [contentTypeCharset] (the HTTP
@@ -175,19 +187,55 @@ object FeedParser {
                 (type == null && medium == null) || type?.startsWith("image/") == true || medium == "image"
             }
         val enclosure = item.rawEnclosure?.takeIf { it.type?.startsWith("image/") == true }
-        val candidates =
-            sequenceOf(media?.url, item.image, enclosure?.url) +
-                sequenceOf(item.content, item.description).map { html ->
-                    html
-                        ?.let { IMG_SRC.find(it) }
-                        ?.groupValues
-                        ?.drop(2)
-                        ?.firstOrNull { v -> v.isNotEmpty() }
-                }
+        val tags = sequenceOf(item.content, item.description).filterNotNull().flatMap { IMG_TAG.findAll(it) }
+        val pixels = tags.mapNotNull { tag -> attribute(tag.value, IMG_SRC_ATTR)?.takeIf { isPixel(tag.value, it) } }
+        // RSS-Parser fills item.image from the description's first <img> itself, so the same
+        // pixel test applies to it.
+        val parsedImage =
+            item.image?.takeUnless { image ->
+                TRACKING_SRC.containsMatchIn(image) ||
+                    pixels.any { it.trim() == image.trim() }
+            }
+        val firstPicture =
+            tags
+                .mapNotNull { tag ->
+                    attribute(tag.value, IMG_SRC_ATTR)?.takeUnless { isPixel(tag.value, it) }
+                }.firstOrNull()
+        val candidates = sequenceOf(media?.url, parsedImage, enclosure?.url, firstPicture)
         return candidates
             .mapNotNull { normalizeImageUrl(it) }
             .firstOrNull()
     }
+
+    /**
+     * True when an `<img>` is a tracking pixel (B40): declared at 2 px or less, or with an
+     * address that reads like a beacon. Loading one would tell its host which article the user
+     * scrolled past, which is exactly what Newz promises not to allow.
+     */
+    private fun isPixel(
+        tag: String,
+        src: String,
+    ): Boolean {
+        val tiny =
+            listOf(IMG_WIDTH_ATTR, IMG_HEIGHT_ATTR).any { attr ->
+                attribute(tag, attr)
+                    ?.trim()
+                    ?.removeSuffix("px")
+                    ?.toIntOrNull()
+                    ?.let { it <= 2 } == true
+            }
+        return tiny || TRACKING_SRC.containsMatchIn(src)
+    }
+
+    private fun attribute(
+        tag: String,
+        pattern: Regex,
+    ): String? =
+        pattern
+            .find(tag)
+            ?.groupValues
+            ?.drop(2)
+            ?.firstOrNull { it.isNotEmpty() }
 
     private fun normalizeImageUrl(raw: String?): String? {
         val decoded = raw?.let(HtmlText::decodeEntities)?.trim().orEmpty()
