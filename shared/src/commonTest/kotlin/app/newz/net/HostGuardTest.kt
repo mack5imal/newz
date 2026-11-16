@@ -94,6 +94,21 @@ class HostGuardTest {
     }
 
     @Test
+    fun existingPunycodeLabelsAreDecodedBeforeMatching() {
+        // B23: the engine decodes `xn--google-` to `google`, so HostGuard must too.
+        assertEquals("google.com", HostGuard.normalizeHost("xn--google-.com"))
+        assertEquals("google.com", HostGuard.normalizeHost("XN--GOOGLE-.com"))
+        assertTrue(HostGuard.isBlocked("https://xn--google-.com/rss"))
+        assertTrue(HostGuard.isBlocked("https://feeds.xn--feedburner-.com/x"))
+        // Real IDN labels survive the round trip unchanged.
+        assertEquals("xn--bcher-kva.example", HostGuard.normalizeHost("XN--BCHER-KVA.example"))
+        assertEquals("bücher", Punycode.decode("bcher-kva"))
+        // Labels that are not valid punycode cannot be judged, so they are blocked.
+        assertTrue(HostGuard.isBlockedHost("xn--!!.example"))
+        assertTrue(HostGuard.isBlockedHost("xn--99999999999.example"))
+    }
+
+    @Test
     fun blocksNonHttpSchemesAndMalformedUrls() {
         assertTrue(HostGuard.isBlocked("ftp://bbc.co.uk/x"))
         assertTrue(HostGuard.isBlocked("javascript:alert(1)"))

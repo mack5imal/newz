@@ -229,6 +229,14 @@ kotlin {
             implementation(libs.ktor.client.mock)
             implementation(libs.kotlinx.coroutines.test)
         }
+        // The OkHttp engine and its HostGuard checks (B23) are one file compiled into both
+        // OkHttp targets, rather than two copies that could drift apart.
+        androidMain {
+            kotlin.srcDir("src/okhttpMain/kotlin")
+        }
+        jvmMain {
+            kotlin.srcDir("src/okhttpMain/kotlin")
+        }
         androidMain.dependencies {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.sqldelight.android.driver)

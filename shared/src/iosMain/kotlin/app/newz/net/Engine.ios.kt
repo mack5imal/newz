@@ -11,3 +11,9 @@ internal actual fun platformHttpEngine(): HttpClientEngine =
             HTTPCookieStorage = null
         }
     }
+
+/**
+ * NSURLSession offers no public way to ask for its canonical host, so iOS relies on
+ * [HostGuard.normalizeHost] alone (which decodes `xn--` labels). iOS is not shipped.
+ */
+internal actual fun engineCanonicalHost(host: String): String? = host
