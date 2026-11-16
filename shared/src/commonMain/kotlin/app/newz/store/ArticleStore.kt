@@ -48,6 +48,9 @@ class ArticleStore(
             for (item in items) {
                 val id = ArticleIds.of(outletId, item.guid, item.url)
                 val publishedAt = item.publishedAt?.toEpochMilliseconds()
+                // Every sighting is kept, not just the first (B31): the same story in two of an
+                // outlet's sections is one row, and unfollowing one section must not hide it.
+                db.articleFeedQueries.upsert(id, feedId, topicsText)
                 val existing = db.articleQueries.selectById(id).executeAsOneOrNull()
                 if (existing == null) {
                     db.articleQueries.insertIfAbsent(
@@ -86,12 +89,25 @@ class ArticleStore(
             .executeAsList()
             .map { it.toModel() }
 
+    /**
+     * Every feed each cached article was seen in, with that feed's topics, by article id (B31).
+     * The article row's own feed is always among them.
+     */
+    fun articleSightings(): Map<String, List<FeedSighting>> =
+        db.articleFeedQueries
+            .selectAll()
+            .executeAsList()
+            .groupBy({ it.articleId }) { FeedSighting(it.feedId, decodeTopics(it.topics)) }
+
     /** Drops cached articles published before `now - age`. Saved articles are never dropped. */
     fun pruneOlderThan(
         age: Duration,
         now: Instant = Clock.System.now(),
     ) {
-        db.articleQueries.pruneBefore((now - age).toEpochMilliseconds())
+        db.transaction {
+            db.articleQueries.pruneBefore((now - age).toEpochMilliseconds())
+            db.articleFeedQueries.pruneOrphans()
+        }
     }
 
     // Hidden

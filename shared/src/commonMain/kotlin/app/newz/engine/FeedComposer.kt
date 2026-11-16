@@ -7,6 +7,7 @@ import app.newz.feed.Article
 import app.newz.filter.FeedFilter
 import app.newz.filter.FilterContext
 import app.newz.store.ArticleStore
+import app.newz.store.FeedSighting
 import app.newz.store.StoredArticle
 import app.newz.store.UserPrefs
 import kotlin.time.Instant
@@ -22,6 +23,8 @@ class FeedSnapshot(
     val savedIds: Set<String>,
     val customFeedIds: Set<String>,
     val affinity: ReadingAffinity,
+    /** Every feed each article was seen in (B31), by article id; missing ids have only their own. */
+    val sightings: Map<String, List<FeedSighting>> = emptyMap(),
 ) {
     companion object {
         /** Reads [store] now. Call it on the store's dispatcher. */
@@ -36,6 +39,7 @@ class FeedSnapshot(
                 savedIds = store.listSaved().mapTo(HashSet()) { it.article.id },
                 customFeedIds = store.listCustomFeeds().mapTo(HashSet()) { it.id },
                 affinity = if (prefs.readingHistoryOn) ReadingAffinity(store.listHistory()) else ReadingAffinity.EMPTY,
+                sightings = store.articleSightings(),
             )
     }
 }
@@ -63,8 +67,7 @@ object FeedComposer {
         val ctx = FilterContext(prefs, catalog, snapshot.hiddenIds, now, snapshot.customFeedIds)
         val eligible =
             snapshot.articles
-                .map(::toArticle)
-                .filter { FeedFilter.eligible(it, ctx) }
+                .mapNotNull { eligibleSighting(it, snapshot.sightings[it.id], ctx) }
                 .sortedWith(compareBy<Article> { it.firstSeenAt }.thenBy { it.id })
                 .distinctBy { it.url }
                 .map { FeedFilter.withCustomTopics(it, ctx) }
@@ -74,6 +77,26 @@ object FeedComposer {
                 (if (outletId in followed) 1.0 else 0.0) + snapshot.affinity.outletScore(outletId)
             }
         return FeedRanker.rank(groups, prefs, now)
+    }
+
+    /**
+     * [s] as an [Article] through the first of its feeds the filter lets through, its own feed
+     * first, or null when none does (B31). The same story in two of an outlet's sections stays
+     * in the feed while either section, and its topics, is still followed and unmuted.
+     */
+    private fun eligibleSighting(
+        s: StoredArticle,
+        sightings: List<FeedSighting>?,
+        ctx: FilterContext,
+    ): Article? {
+        val own = toArticle(s)
+        if (FeedFilter.eligible(own, ctx)) return own
+        for (sighting in sightings.orEmpty()) {
+            if (sighting.feedId == s.feedId) continue
+            val other = own.copy(feedId = sighting.feedId, topics = sighting.topics)
+            if (FeedFilter.eligible(other, ctx)) return other
+        }
+        return null
     }
 
     fun toArticle(s: StoredArticle): Article =
