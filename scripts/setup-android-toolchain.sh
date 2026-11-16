@@ -13,6 +13,9 @@ LOCAL_JDK_DIR="$HOME/.local/jdk-17"
 # The exact Temurin build to install when no JDK 17 is present (B58): a fixed release, not
 # whatever "latest" is on the day, so every machine builds and signs with the same JDK.
 TEMURIN_RELEASE="jdk-17.0.20.1+1"
+TEMURIN_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_aarch64_mac_hotspot_17.0.20.1_1.tar.gz"
+# Adoptium's published SHA-256 for that file; a download that does not match is refused.
+TEMURIN_SHA256="196d13ba5f10414bef7f6a05a9b3f00edacb18ebacef2b99485db9e2ee18f0e8"
 
 log() { printf '[setup] %s\n' "$*"; }
 
@@ -42,8 +45,14 @@ else
     # Temurin 17 tarball into $HOME instead (user JVM dir, plus a ~/.local/jdk-17 link).
     log "Installing Temurin 17 tarball into $USER_JVM_BUNDLE"
     tmp="$(mktemp -d)"
-    curl -fsSL -o "$tmp/jdk.tar.gz" \
-      "https://api.adoptium.net/v3/binary/version/${TEMURIN_RELEASE/+/%2B}/mac/aarch64/jdk/hotspot/normal/eclipse"
+    log "Downloading Temurin $TEMURIN_RELEASE"
+    curl -fsSL -o "$tmp/jdk.tar.gz" "$TEMURIN_URL"
+    actual="$(shasum -a 256 "$tmp/jdk.tar.gz" | awk '{print $1}')"
+    if [ "$actual" != "$TEMURIN_SHA256" ]; then
+      echo "[setup] Temurin download checksum mismatch: got $actual, expected $TEMURIN_SHA256" >&2
+      rm -rf "$tmp"
+      exit 1
+    fi
     tar -xzf "$tmp/jdk.tar.gz" -C "$tmp"
     bundle="$(find "$tmp" -maxdepth 1 -mindepth 1 -type d -name 'jdk-17*' | head -n 1)"
     mkdir -p "$(dirname "$USER_JVM_BUNDLE")"
