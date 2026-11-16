@@ -203,6 +203,14 @@ class ArticleStore(
         db.historyQueries.deleteAll()
     }
 
+    /**
+     * Forgets opens older than [HISTORY_RETENTION] (B34). Without it the table only grows, and
+     * every feed compose reads all of it for reading affinity.
+     */
+    fun pruneHistory(now: Instant = Clock.System.now()) {
+        db.historyQueries.pruneBefore((now - HISTORY_RETENTION).toEpochMilliseconds())
+    }
+
     // Feed status
 
     fun markFeedOk(
@@ -348,6 +356,9 @@ class ArticleStore(
          * read twice, and long enough to spot an outlet's logo standing in for its pictures.
          */
         val PAGE_IMAGE_RETENTION: Duration = 30.days
+
+        /** How long reading history is kept: long enough for affinity to reflect habits, not forever. */
+        val HISTORY_RETENTION: Duration = 180.days
 
         private val topicsSerializer = ListSerializer(String.serializer())
 

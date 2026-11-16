@@ -7,11 +7,17 @@ CREATE TABLE history (
     openedAt INTEGER NOT NULL
 );
 
+CREATE INDEX history_openedAt ON history(openedAt);
+
 insert:
 INSERT INTO history(articleId, outletId, topics, openedAt) VALUES (?, ?, ?, ?);
 
 deleteAll:
 DELETE FROM history;
+
+-- History is kept for a limited time (B34), like the article, hidden and page_image tables.
+pruneBefore:
+DELETE FROM history WHERE openedAt < :cutoff;
 
 selectAll:
 SELECT * FROM history ORDER BY openedAt, articleId;

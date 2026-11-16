@@ -10,3 +10,6 @@ CREATE TABLE article_feed (
 );
 
 INSERT OR IGNORE INTO article_feed(articleId, feedId, topics) SELECT id, feedId, topics FROM article;
+
+-- history_openedAt (B34): history is now pruned by age.
+CREATE INDEX history_openedAt ON history(openedAt);
