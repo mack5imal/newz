@@ -155,8 +155,14 @@ object FeedParser {
                 }
             when {
                 skipTo == -1 -> return DECLARATION.containsMatchIn(xml.substring(lt + 1))
+
                 skipTo != null -> i = skipTo
-                DECLARATION.matchAt(xml, lt) != null -> return true
+
+                // Plain comparisons, not a regex at each '<': on Android a regex match from an
+                // offset can cost the length of the document, which made a 5,000-item feed crawl.
+                xml.regionMatches(lt, "<!DOCTYPE", 0, 9, ignoreCase = true) ||
+                    xml.regionMatches(lt, "<!ENTITY", 0, 8, ignoreCase = true) -> return true
+
                 else -> i = lt + 1
             }
         }
