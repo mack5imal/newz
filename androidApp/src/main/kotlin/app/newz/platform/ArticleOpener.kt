@@ -7,6 +7,7 @@ import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.net.toUri
+import app.newz.net.HostGuard
 import app.newz.net.WebUrl
 import app.newz.store.ThemeMode
 import app.newz.ui.theme.NewzColors
@@ -26,12 +27,16 @@ class ArticleOpener(
     private val customTabsProvider: () -> String?,
     private val theme: () -> ThemeMode = { ThemeMode.SYSTEM },
 ) {
-    /** Returns false when [url] is not an http(s) link or no app on the device can open it. */
+    /**
+     * Returns false when [url] is not an http(s) link, is on a Google host, or no app on the
+     * device can open it. The parser already drops Google links (B25); this also covers saved
+     * articles stored before that.
+     */
     fun open(
         context: Context,
         url: String,
     ): Boolean {
-        if (!WebUrl.isWebUrl(url)) return false
+        if (!WebUrl.isWebUrl(url) || HostGuard.isBlocked(url)) return false
         val uri = url.toUri()
         return try {
             if (customTabsProvider() != null) {

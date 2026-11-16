@@ -90,6 +90,24 @@ class FeedParserHardeningTest {
         }
 
     @Test
+    fun itemsLinkingToGoogleHostsAreDropped() =
+        runTest {
+            // B25: opening such a card would tell Google (FeedBurner) which article was read.
+            val feed =
+                parse(
+                    rss(
+                        listOf(
+                            Item("Proxy", "https://feedproxy.google.com/~r/site/~3/abc/story.html", null),
+                            Item("Video", "https://www.youtube.com/watch?v=abc", null),
+                            Item("Disguised", "https://xn--google-.com/story", null),
+                            Item("Fine", "https://e.example/fine", null),
+                        ),
+                    ),
+                )
+            assertEquals(listOf("Fine"), feed.items.map { it.title })
+        }
+
+    @Test
     fun brokenImageUrlIsKeptAsAnUnloadableImageNotAnError() =
         runTest {
             val xml =
