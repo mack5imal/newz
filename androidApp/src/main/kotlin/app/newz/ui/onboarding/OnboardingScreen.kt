@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import app.newz.catalog.Catalog
 import app.newz.ui.components.BottomActionBar
 import app.newz.ui.components.FlapWordmark
+import app.newz.ui.components.NoteRow
 import app.newz.ui.components.PlainText
 import app.newz.ui.components.SplitRule
 import app.newz.ui.components.TopicChip
@@ -75,6 +76,17 @@ fun OnboardingScreen(
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                 OnboardingHeader()
                 SplitRule()
+                if (viewModel.settingsWereReset) {
+                    // B32: a damaged settings file was replaced, which is why onboarding is back.
+                    NoteRow(
+                        icon = NewzIcons.iconWarning,
+                        text = "Your settings couldn’t be read",
+                        subtitle =
+                            "They were reset, so pick your topics again. Saved articles are still here, " +
+                                "and a backup file can restore the rest.",
+                        color = c.alert,
+                    )
+                }
                 Column(Modifier.padding(horizontal = NewzTokens.spaceL, vertical = NewzTokens.onboardingGap)) {
                     SignageText(
                         text = "Pick at least 3 topics",
