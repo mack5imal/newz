@@ -10,69 +10,81 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 
 ## Open
 
+## Fixed
+
 ### B47 — Feed scroll position and screen state lost on every navigation (R12)
 - **Severity:** Medium
 - **Where:** `androidApp/.../ui/nav/Navigation.kt` (`NavHost`)
 - **Seen:** in review. Scrolling 60 cards down, opening Saved and pressing Back lands at the top.
+- **Fixed in:** `7927242` (each back-stack entry has its own SaveableStateHolder slot; scroll and screen state come back on Back).
 
 ### B48 — Landscape: app bars and settings ignore side insets (R13)
 - **Severity:** Medium
 - **Where:** `androidApp/.../ui/components/AppBars.kt`, `SettingsScreen.kt` (`ScreenFrame`), `NewzApp`
 - **Seen:** in review. With 3-button navigation on the right, Settings and Remove buttons sit under
   the nav bar; the back arrow sits under the camera cutout.
+- **Fixed in:** `6cd47bd` (horizontal safe-drawing insets once at the app root; the feed list keeps only its bottom inset).
 
 ### B49 — Backup "include history" choice lost if the process dies in the file picker (R21)
 - **Severity:** Low
 - **Where:** `androidApp/.../settings/BackupViewModel.kt`
 - **Seen:** in review. The backup is then written without history, silently.
+- **Fixed in:** `c7604b8` (the choice lives in the screen's saved state and is passed to export).
 
 ### B50 — Onboarding picks lost on process death (R22)
 - **Severity:** Low
 - **Where:** `androidApp/.../onboarding/OnboardingViewModel.kt`
 - **Seen:** in review. Switching apps to look up a zip code can lose every pick.
+- **Fixed in:** `eca274a` (the screen saves the picks and hands them to a new view model after process death).
 
 ### B51 — Keyword-mute and zip sheets don't scroll; the keyboard hides their buttons (R29)
 - **Severity:** Low
 - **Where:** `androidApp/.../feed/KeywordMuteSheet.kt`, `settings/ZipCodeSheet.kt`
 - **Seen:** in review. In landscape or at large text the Mute/Save row is cut off.
+- **Fixed in:** `1396a65` (both sheets cap their height, scroll their body and keep the buttons above the keyboard).
 
 ### B52 — TalkBack can reach the screen behind an open sheet (R30)
 - **Severity:** Low
 - **Where:** `androidApp/.../components/Sheets.kt` (`BottomSheet`), `FeedScreen.kt`
 - **Seen:** in review. Swiping past the last sheet action moves focus to the feed behind it.
+- **Fixed in:** `1282209` (content behind an open sheet is cleared from semantics; the sheet is a traversal group) and `2155178` (test update).
 
 ### B53 — The Undo snackbar ignores the accessibility timeout (R31)
 - **Severity:** Low
 - **Where:** `androidApp/.../components/Feedback.kt`
 - **Seen:** in review. It always closes after 6 s.
+- **Fixed in:** `4153c0f` (LocalAccessibilityManager's recommended timeout).
 
 ### B54 — Card menu, keyword and story-group sheets close on rotation (R32)
 - **Severity:** Low
 - **Where:** `androidApp/.../feed/FeedScreen.kt`
 - **Seen:** in review. Typed keyword text is lost on rotation, dark-mode change or text size change.
+- **Fixed in:** `ad48186` (sheet state in rememberSaveable; the story group kept by its lead id).
 
 ### B55 — Saved composes every saved article at once (R33)
 - **Severity:** Low
 - **Where:** `androidApp/.../saved/SavedScreen.kt`
 - **Seen:** in review. A few hundred saved articles all compose and load thumbnails together.
+- **Fixed in:** `e3a8a80` (LazyColumn keyed by article id, through LazyScreenFrame).
 
 ### B56 — Saved's offline banner only updates when the feed changes (R34)
 - **Severity:** Low
 - **Where:** `androidApp/.../saved/SavedViewModel.kt`
 - **Seen:** in review. The banner stays after Wi-Fi returns, and never appears on going offline.
+- **Fixed in:** `1f82705` (a ConnectivityManager callback flow re-checks the network).
 
 ### B57 — Screen view models live as long as the activity (R35)
 - **Severity:** Low
 - **Where:** `androidApp/.../MainActivity.kt`, `ui/nav/Navigation.kt`
 - **Seen:** in review. A Sources snackbar reappears on Settings; Saved keeps collecting when closed.
+- **Fixed in:** `7927242` (a ViewModelStore per back-stack entry, cleared when the entry is popped).
 
 ### B58 — Toolchain script installs an unpinned JDK and edits the global Gradle config (R36)
 - **Severity:** Low
 - **Where:** `scripts/setup-android-toolchain.sh`
 - **Seen:** in review. Downloads Adoptium's moving `latest/17` without a checksum and writes
   `org.gradle.java.home` into `~/.gradle/gradle.properties`.
-
-## Fixed
+- **Fixed in:** `89a954e` (pinned Temurin release; daemon JDK from gradle/gradle-daemon-jvm.properties, nothing written to ~/.gradle) and `6d2f423` (SHA-256 check against Adoptium's published checksum).
 
 ### B35 — Full-text summaries merge unrelated stories into one card and slow grouping (R7)
 - **Severity:** Medium
@@ -134,7 +146,7 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 - **Severity:** Low
 - **Where:** `FeedParser.kt` (`DECLARATION`)
 - **Seen:** in review. The declaration check scans the whole document, CDATA included.
-- **Fixed in:** `d6c3161` (declarations are looked for only as markup, outside comments and CDATA).
+- **Fixed in:** `d6c3161` (declarations are looked for only as markup, outside comments and CDATA) and `7700670` (the scan compares strings instead of matching a regex at each tag, which was slow on Android).
 
 ### B45 — A pull during a finishing load's last compose loses its re-rank (R26)
 - **Severity:** Low
