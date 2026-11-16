@@ -17,3 +17,6 @@ internal actual fun platformHttpEngine(): HttpClientEngine =
  * [HostGuard.normalizeHost] alone (which decodes `xn--` labels). iOS is not shipped.
  */
 internal actual fun engineCanonicalHost(host: String): String? = host
+
+/** iOS is not shipped; its image downloads are bounded only by the request timeout. */
+internal actual fun platformImageEngine(maxBodyBytes: Long): HttpClientEngine = platformHttpEngine()
