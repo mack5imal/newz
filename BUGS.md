@@ -10,6 +10,8 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 
 ## Open
 
+## Fixed
+
 ### B29 — Importing a backup silently deletes reading history and recently saved articles (R4)
 - **Severity:** High (data loss)
 - **Where:** `shared/.../store/BackupCodec.kt` (`BackupRestorer.restore`),
@@ -17,36 +19,40 @@ Severity: **High** blocks testing or loses data · **Medium** wrong behavior wit
 - **Seen:** in review. Export leaves history out by default, and import of such a file empties the
   history. Import starts as soon as the file is picked, with no confirmation, and the warning does
   not mention saved articles or history.
+- **Fixed in:** `c2112e8` (a confirm sheet lists what the restore replaces; a backup without history keeps the phone's history) and the UI-test update after it.
 
 ### B30 — Restoring a backup never fetches the restored sources (R5)
 - **Severity:** Medium
 - **Where:** `androidApp/.../settings/BackupViewModel.kt` (`import`)
 - **Seen:** in review. After a restore on a new phone, the feed shows only the onboarding sources
   until a manual pull.
+- **Fixed in:** `fbb9400` (a restore refreshes and re-ranks the feed).
 
 ### B31 — A story in two sections of one outlet keeps the first section's feed and topics (R6)
 - **Severity:** Medium
 - **Where:** `shared/.../store/ArticleStore.kt` (`upsert`), `Article.sq`, `filter/FeedFilter.kt`
 - **Seen:** in review. Following nyt-world and nyt-us, then unfollowing World hides a story that
   nyt-us still carries.
+- **Fixed in:** `013e0ba` (article_feed table, migration 2 -> 3; an article shows through the first of its feeds the filter lets through).
 
 ### B32 — A damaged preferences file crashes the app on every launch (R19)
 - **Severity:** Low
 - **Where:** `shared/.../store/PreferencesStore.kt`
 - **Seen:** in review. No DataStore corruption handler; the only way out is clearing app data.
+- **Fixed in:** `30a14d6` (DataStore corruption handler resets to defaults; onboarding says the settings could not be read).
 
 ### B33 — An interrupted restore can pair the backup's preferences with the old tables (R20)
 - **Severity:** Low
 - **Where:** `BackupCodec.kt` (`BackupRestorer.restore`), `BackupViewModel.kt`
 - **Seen:** in review. Preferences are replaced before the tables, and the restore runs in the
   screen's scope.
+- **Fixed in:** `048cd55` (tables first, prefs last with the tables put back if the prefs write fails; the restore runs to the end in the app's scope).
 
 ### B34 — Reading history is never pruned and is re-read in full on every recompose (R28)
 - **Severity:** Low
 - **Where:** `History.sq`, `engine/RefreshCoordinator.kt`
 - **Seen:** in review. History grows without bound and every feed compose reads all of it.
-
-## Fixed
+- **Fixed in:** `cdb7866` (history older than 180 days is pruned at each load; openedAt is indexed).
 
 ### B23 — HostGuard and OkHttp read hosts differently, so disguised Google hosts get through (R1)
 - **Severity:** High (breaks the no-Google promise)
