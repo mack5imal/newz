@@ -78,6 +78,11 @@ If Terminal says `adb: command not found`, use the full path instead:
 To install a newer version, build again (step 2, last command) and install the new
 APK the same way. Your sources, topics and saved stories stay in place.
 
+A new version may upgrade the app's data when it first opens, and Android will not
+install an older version over a newer one. Before updating, export a backup in
+**Settings › Backup & restore › Export to a file** (tick "Include reading history" to
+keep it too), so you can always get your choices back.
+
 This only works if the new build is signed with **the same key**. Android refuses an
 update signed with a different key. Keep the `keystore/` folder backed up: if you
 lose it, you have to uninstall Newz (which deletes its data on the phone; use

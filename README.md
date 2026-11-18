@@ -32,7 +32,8 @@ autonomous run, then polished through a couple of hours of hands-on testing and 
 - **Works offline.** Articles are cached on the phone, and saved articles stay readable.
 - **Your data stays yours.** Reading history is optional, on-device only and forgotten after
   180 days. Settings, follows,
-  mutes and saved articles can be exported to a file and imported again.
+  mutes and saved articles can be exported to a file and imported again. A restore says what it
+  will replace and asks first, and a backup made without reading history leaves yours alone.
 
 Articles open in your browser's in-app tab. Newz shows headlines and pictures from the feeds; it
 does not copy or host articles.
@@ -47,12 +48,13 @@ relying on good intentions:
   FeedBurner, DoubleClick, Firebase and more). Feeds, pictures and discovered sites are all
   checked, including after redirects. The HTTP engine checks again, on the host name exactly as
   it will connect to it, so disguised spellings (punycode, lookalike Unicode letters, invisible
-  characters) cannot slip through.
+  characters) cannot slip through. Feed items that link to a Google host are dropped, and links
+  to bare IP addresses are refused.
 - No Google Play Services, Firebase, analytics, crash reporting or ad libraries. The release
   check script fails the build if any of them appear in the dependency tree.
 - The app asks for two permissions only: internet access and network status.
 - There is no Newz server. The only requests the app makes are to the publishers whose feeds
-  you follow, identified by a plain User-Agent: `Newz/1.0 (+https://github.com/mack5imal/newz; RSS reader)`.
+  you follow, identified by a plain User-Agent: `Newz/1.1 (+https://github.com/mack5imal/newz; RSS reader)`.
 
 The browser you choose for opening articles has its own privacy policy; Newz uses whichever
 browser is your default.
